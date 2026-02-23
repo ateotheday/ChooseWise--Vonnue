@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login · ChooseWise</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
+</head>
+<body>
+
+<div class="cloud one"></div>
+<div class="cloud two"></div>
+
+<header>
+  <div class="logo">ChooseWise</div>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/register">Register</a>
+  </nav>
+</header>
+
+<section class="auth-wrap">
+  <div class="auth-card reveal show">
+    {% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <div style="background:#fff; border:1px solid rgba(0,0,0,0.08); padding:12px; border-radius:14px; margin:12px 0; color:#334155;">
+      {{ messages[0] }}
+    </div>
+  {% endif %}
+{% endwith %}
+    <h2>Welcome back !</h2>
+    <p class="auth-sub">Log in to continue to your dashboard.</p>
+
+    <form method="POST" action="/login" class="auth-form">
+      <label>Email</label>
+      <input type="email" name="email" placeholder="you@example.com" required>
+
+      <label>Password</label>
+      <input type="password" name="password" placeholder="••••••••" required>
+
+      <button class="btn primary auth-btn" type="submit">Login</button>
+    </form>
+
+    <p class="auth-foot">
+      Don’t have an account?
+      <a href="/register">Create one</a>
+    </p>
+  </div>
+</section>
+
+<script>
+  const observer = new IntersectionObserver((entries)=>{
+    entries.forEach(entry=>{
+      if(entry.isIntersecting){
+        entry.target.classList.add("show");
+      }
+    });
+  },{threshold:0.2});
+
+  document.querySelectorAll(".reveal").forEach(el=>{
+    observer.observe(el);
+  });
+</script>
+
+</body>
+</html>

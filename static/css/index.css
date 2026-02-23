@@ -192,3 +192,84 @@ footer{
 @media(max-width:900px){
   .grid{grid-template-columns:1fr}
 }
+/* Auth pages-(1) LOGIN */
+.auth-wrap{
+  min-height: calc(100vh - 120px);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  padding: 40px 20px 80px;
+}
+
+.auth-card{
+  width: 100%;
+  max-width: 460px;
+  background: rgba(255,255,255,0.85);
+  border-radius: 22px;
+  padding: 28px;
+  box-shadow: 0 18px 55px rgba(0,0,0,0.10);
+}
+
+.auth-card h2{
+  font-size: 28px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.auth-sub{
+  color:#475569;
+  line-height:1.6;
+  margin-bottom: 18px;
+}
+
+.auth-form{
+  display:flex;
+  flex-direction:column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.auth-form label{
+  font-weight: 600;
+  color:#334155;
+  font-size: 14px;
+  margin-top: 6px;
+}
+
+.auth-form input{
+  padding: 13px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(0,0,0,0.10);
+  outline: none;
+  background: rgba(255,255,255,0.95);
+  transition: 0.2s;
+}
+
+.auth-form input:focus{
+  border-color: rgba(59,130,246,0.45);
+  box-shadow: 0 0 0 4px rgba(59,130,246,0.15);
+}
+
+.auth-btn{
+  width: 100%;
+  margin: 16px 0 0;
+  text-align:center;
+  display:block;
+}
+
+.auth-foot{
+  margin-top: 14px;
+  color:#64748b;
+  font-size: 14px;
+  text-align:center;
+}
+
+.auth-foot a{
+  color:#3b82f6;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.auth-foot a:hover{
+  text-decoration: underline;
+}
