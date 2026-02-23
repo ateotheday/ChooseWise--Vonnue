@@ -10,8 +10,14 @@ During development, I considered using MySQL since I had XAMPP installed and it 
 
 I have made :
 -The landing page.
+
+
 -Login and register routes.
+
+
 -SQLite database integration.
+
+
 
 
 Mistakes encountered :
