@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChooseWise</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
+</head>
+
+<body>
+
+<div class="cloud one"></div>
+<div class="cloud two"></div>
+
+<header>
+  <div class="logo">ChooseWise</div>
+  <nav>
+    <a href="#home">Home</a>
+    <a href="#about">About</a>
+    <a href="/login">Login/Register</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <h1>MAKE WISE CHOICES, with chooseWise!</h1>
+  <p>
+    ChooseWise helps you compare options and gives you the confidence to choose wisely. 
+    No more analysis paralysis — just clear, explainable rankings based on what matters most to you.
+  </p>
+  <div class="buttons">
+    <a href="/register" class="btn primary">Get Started</a>
+    <a href="#how" class="btn secondary">Learn More</a>
+  </div>
+</section>
+
+<section id="about" class="section reveal">
+  <h2>About ChooseWise</h2>
+  <p>
+    ChooseWise is a web-based decision support platform designed to help users 
+    make thoughtful and structured choices between multiple options.
+  </p>
+  <p>
+    The system allows users to define what matters most to them, assign importance 
+    to different criteria, and compare options in a clear and organized way.
+  </p>
+  <p>
+    To make the process easier, the platform includes an optional personality-based quiz 
+    that helps generate sensible starting weights for users who may be unsure how to begin.
+  </p>
+  <p>
+    The goal of the platform is simple: to turn complex decisions into clear, 
+    understandable, and confident choices.
+  </p>
+</section>
+
+<section id="how" class="section reveal">
+  <h2>How to use</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>1. Add criteria</h3>
+      <p>Define what matters and assign importance.</p>
+    </div>
+    <div class="card">
+      <h3>2. Add options</h3>
+      <p>Enter your choices and input values.</p>
+    </div>
+    <div class="card">
+      <h3>3. View ranking</h3>
+      <p>See the final score with explanation.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  © 2026 ChooseWise · Clear decisions.
+</footer>
+
+<script>
+  const observer = new IntersectionObserver((entries)=>{
+    entries.forEach(entry=>{
+      if(entry.isIntersecting){
+        entry.target.classList.add("show");
+      }
+    });
+  },{threshold:0.2});
+
+  document.querySelectorAll(".reveal").forEach(el=>{
+    observer.observe(el);
+  });
+</script>
+
+</body>
+</html>
