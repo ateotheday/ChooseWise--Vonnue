@@ -25,3 +25,41 @@ Mistakes encountered :
   If the user entered the wrong credentials, the page just reloaded. No error message was displayed. 
 This error was corrected by :
 Implementing flash messages to display error feedback to the user.
+
+
+
+
+day #2 [24/02/26]
+
+
+Today I,
+
+Connected Quiz to Backend (app.py)
+
+
+Configured POST handling
+
+
+Extracted form inputs using request.form
+
+
+Stored weights in session
+
+
+Redirected to the dashboard after completion
+
+The quiz is set up in such a way that when a person logs in, they have to take the quiz to form the base weights. Then, when they log in again, they will be redirected to the dashboard only.
+
+
+A person table was created to handle user authentication and to manage the onboarding flow. Along with the usual login fields like email, password hash, and role, I added a quiz_completed flag to control whether the user has finished the preference quiz.
+
+When a user logs in, the backend checks this flag. If the user hasn’t completed the quiz yet, they are redirected to the quiz page. If they have already completed it, they are taken directly to the dashboard.
+
+Once the quiz is submitted, the system updates the quiz_completed field in the database. This ensures that the quiz is only shown once and the user experience remains smooth during future logins.
+
+Issues encountered :
+
+
+Even after completing the quiz, logging in still led to the quiz again.
+I figured the problem is probably because the profiles table is not getting updated.
+
