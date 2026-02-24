@@ -17,4 +17,15 @@ Outcome: from [Stackoverflow] Identified trade-offs in setup complexity and scal
 
 Impact on Development: Opt for SQLite for its portability and simplified deployment.
 
+day #2
+
+prompts :
+[ChatGPT]
+How to fix the issue with database. I created the person table and updated it but the user is not getting redirected to the dashboard after completing the quiz once.
+
+
+[youtube]
+
+
+How RAG systems work.video by[CampusX]
 
