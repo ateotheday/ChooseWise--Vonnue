@@ -33,6 +33,19 @@ def init_db():
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
     """)
+#profiles tble for saving the user profile data from the quiz
+    cur.execute("""
+CREATE TABLE IF NOT EXISTS profiles (
+    user_id INTEGER PRIMARY KEY,
+    risk INTEGER,
+    budget INTEGER,
+    long_term INTEGER,
+    analytical INTEGER,
+    convenience INTEGER,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+)
+""")
 
     conn.commit()
     conn.close()
@@ -119,7 +132,7 @@ def login():
 
     session["user_id"] = user["id"]
     session["user_name"] = user["name"]
-    return redirect(url_for("dashboard"))
+    return redirect(url_for("quiz"))
 
 
 @app.route("/logout")
@@ -134,7 +147,38 @@ def logout():
 def dashboard():
     return render_template("dashboard.html", name=session.get("user_name"))
 
+@app.route("/quiz", methods=["GET", "POST"])
+@login_required
+def quiz():
+    if request.method == "POST":
+        risk = int(request.form.get("risk", 0))
+        budget = int(request.form.get("budget", 0))
+        long_term = int(request.form.get("long_term", 0))
+        analytical = int(request.form.get("analytical", 0))
+        convenience = int(request.form.get("convenience", 0))
 
+        if any(v < 1 or v > 5 for v in [risk, budget, long_term, analytical, convenience]):
+            flash("Please select values between 1 and 5 for all questions.")
+            return render_template("quiz.html")
+
+        conn = get_db()
+        conn.execute("""
+            INSERT INTO profiles (user_id, risk, budget, long_term, analytical, convenience)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                risk=excluded.risk,
+                budget=excluded.budget,
+                long_term=excluded.long_term,
+                analytical=excluded.analytical,
+                convenience=excluded.convenience
+        """, (session["user_id"], risk, budget, long_term, analytical, convenience))
+        conn.commit()
+        conn.close()
+
+        return redirect(url_for("dashboard"))
+
+    return render_template("quiz.html")
+print("DB PATH:", DB_PATH)
 if __name__ == "__main__":
     init_db()
     app.run(debug=True)
