@@ -273,3 +273,94 @@ footer{
 .auth-foot a:hover{
   text-decoration: underline;
 }
+/* QUIZ page (SCOPED ONLY TO quiz.html) */
+body.sky-quiz {
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background: linear-gradient(to bottom, #87ceeb, #e0f7ff);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+body.sky-quiz .quiz-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
+body.sky-quiz .quiz-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(10px);
+  padding: 40px;
+  width: 500px;
+  max-width: 92vw;
+  border-radius: 20px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  animation: floatCard 0.8s ease;
+}
+
+body.sky-quiz .quiz-card h2 {
+  margin-top: 0;
+  text-align: center;
+  color: #1a4f7a;
+}
+
+body.sky-quiz .subtitle {
+  text-align: center;
+  color: #4a6f8a;
+  margin-bottom: 30px;
+}
+
+body.sky-quiz .question {
+  margin-bottom: 20px;
+}
+
+body.sky-quiz .question label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #1a4f7a;
+}
+
+body.sky-quiz .question input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #cce7ff;
+  font-size: 14px;
+  outline: none;
+  transition: 0.3s;
+  background: rgba(255,255,255,0.95);
+}
+
+body.sky-quiz .question input:focus {
+  border-color: #4da6ff;
+  box-shadow: 0 0 0 4px rgba(77, 166, 255, 0.18);
+}
+
+body.sky-quiz .quiz-btn {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(to right, #4da6ff, #1e90ff);
+  color: white;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+body.sky-quiz .quiz-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(30, 144, 255, 0.35);
+}
+
+@keyframes floatCard {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}

@@ -1,12 +1,47 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dashboard · ChooseWise</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
+  <title>Dashboard</title>
 </head>
+<body>
+
+  <h2>Welcome, {{ name }} 👋</h2>
+
+  {% if profile %}
+    <h3>Your saved preferences</h3>
+
+    <ul>
+      <li>Risk tolerance: {{ profile["risk"] }}</li>
+      <li>Budget sensitivity: {{ profile["budget"] }}</li>
+      <li>Long-term focus: {{ profile["long_term"] }}</li>
+      <li>Decision style (Analytical): {{ profile["analytical"] }}</li>
+      <li>Convenience vs Performance: {{ profile["convenience"] }}</li>
+    </ul>
+
+    <br>
+
+    <!-- Main Action -->
+    <a href="{{ url_for('new_decision') }}">
+      <button>Start New Decision</button>
+    </a>
+
+    <br><br>
+
+  
+    
+
+    <br><br>
+
+    <a href="{{ url_for('logout') }}">
+      <button>Logout</button>
+    </a>
+
+  {% else %}
+    <h3>You haven’t completed the quiz yet ❗</h3>
+    <a href="{{ url_for('quiz') }}">
+      <button>Take Quiz</button>
+    </a>
+  {% endif %}
 
 </body>
 </html>

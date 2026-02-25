@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>New Decision</title>
+</head>
+<body>
+
+  <h2>Start a New Decision</h2>
+
+  <form method="POST">
+    <label>What decision are you trying to make?</label><br><br>
+    <input type="text" name="question" required style="width:300px;"><br><br>
+
+    <button type="submit">Continue</button>
+  </form>
+
+  <br>
+  <a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+
+</body>
+</html>

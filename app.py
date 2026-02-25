@@ -124,16 +124,24 @@ def login():
         "SELECT id, name, email, password_hash FROM users WHERE email = ?",
         (email,)
     ).fetchone()
-    conn.close()
 
     if not user or not check_password_hash(user["password_hash"], password):
+        conn.close()
         flash("Invalid email or password.")
         return render_template("login.html")
 
     session["user_id"] = user["id"]
     session["user_name"] = user["name"]
-    return redirect(url_for("quiz"))
 
+    prof = conn.execute(
+        "SELECT 1 FROM profiles WHERE user_id = ?",
+        (user["id"],)
+    ).fetchone()
+    conn.close()
+
+    if prof:
+        return redirect(url_for("dashboard"))
+    return redirect(url_for("quiz"))
 
 @app.route("/logout")
 def logout():
@@ -145,39 +153,74 @@ def logout():
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    return render_template("dashboard.html", name=session.get("user_name"))
+    conn = get_db()
+    profile = conn.execute(
+        "SELECT risk, budget, long_term, analytical, convenience FROM profiles WHERE user_id = ?",
+        (session["user_id"],)
+    ).fetchone()
+    conn.close()
+
+    return render_template(
+        "dashboard.html",
+        name=session.get("user_name"),
+        profile=profile
+    )
 
 @app.route("/quiz", methods=["GET", "POST"])
 @login_required
 def quiz():
-    if request.method == "POST":
-        risk = int(request.form.get("risk", 0))
-        budget = int(request.form.get("budget", 0))
-        long_term = int(request.form.get("long_term", 0))
-        analytical = int(request.form.get("analytical", 0))
-        convenience = int(request.form.get("convenience", 0))
+    conn = get_db()
+    existing = conn.execute(
+        "SELECT 1 FROM profiles WHERE user_id = ?",   #checks if a profile row exists for that user.
+        (session["user_id"],)
+    ).fetchone()
+    conn.close()
 
-        if any(v < 1 or v > 5 for v in [risk, budget, long_term, analytical, convenience]):
-            flash("Please select values between 1 and 5 for all questions.")
-            return render_template("quiz.html")
+    if request.method == "GET":
+        if existing:
+            return redirect(url_for("dashboard"))  #if exist dashboard
+        return render_template("quiz.html")        #else quiz
 
-        conn = get_db()
-        conn.execute("""
-            INSERT INTO profiles (user_id, risk, budget, long_term, analytical, convenience)
-            VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT(user_id) DO UPDATE SET
-                risk=excluded.risk,
-                budget=excluded.budget,
-                long_term=excluded.long_term,
-                analytical=excluded.analytical,
-                convenience=excluded.convenience
-        """, (session["user_id"], risk, budget, long_term, analytical, convenience))
-        conn.commit()
-        conn.close()
+    risk = int(request.form.get("risk", 0))
+    budget = int(request.form.get("budget", 0))
+    long_term = int(request.form.get("long_term", 0))
+    analytical = int(request.form.get("analytical", 0))
+    convenience = int(request.form.get("convenience", 0))
 
-        return redirect(url_for("dashboard"))
+    if any(v < 1 or v > 5 for v in [risk, budget, long_term, analytical, convenience]):
+        flash("Please select values between 1 and 5 for all questions.")
+        return render_template("quiz.html")
 
-    return render_template("quiz.html")
+    conn = get_db()
+    conn.execute("""
+        INSERT INTO profiles (user_id, risk, budget, long_term, analytical, convenience)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+            risk=excluded.risk,
+            budget=excluded.budget,
+            long_term=excluded.long_term,
+            analytical=excluded.analytical,
+            convenience=excluded.convenience
+    """, (session["user_id"], risk, budget, long_term, analytical, convenience))
+    conn.commit()
+
+    saved = conn.execute(
+        "SELECT * FROM profiles WHERE user_id = ?",
+        (session["user_id"],)
+    ).fetchone()
+    conn.close()
+
+    print("✅ Profile saved:", dict(saved) if saved else None)
+
+    return redirect(url_for("dashboard"))
+
+# ----------------------------
+# ROUTES: DECISION MAKING
+# ---------------------------
+@app.route("/new-decision")
+@login_required
+def new_decision():
+    return render_template("new_decision.html")
 print("DB PATH:", DB_PATH)
 if __name__ == "__main__":
     init_db()

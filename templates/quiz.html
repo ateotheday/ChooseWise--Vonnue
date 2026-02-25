@@ -1,27 +1,51 @@
-<h2>Quick Preference Quiz</h2>
-<p>Answer each question from 1 to 5.</p>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Quick Preference Quiz</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
+</head>
 
-<form method="POST">
+<body class="sky-quiz">
 
-  <label>1) When trying something new, how comfortable are you with uncertainty?</label>
+  <div class="quiz-container">
+    <div class="quiz-card">
 
-  <input type="number" name="risk" min="1" max="5" required><br><br>
+      <h2>Quick Preference Quiz</h2>
+      <p class="subtitle">Answer each question from 1 to 5</p>
 
-  <label>2) How important is staying within a budget for this decision?</label>
- 
-  <input type="number" name="budget" min="1" max="5" required><br><br>
+      <form method="POST">
 
-  <label>3) How much do long-term benefits matter more than short-term comfort?</label>
-  
-  <input type="number" name="long_term" min="1" max="5" required><br><br>
+        <div class="question">
+          <label>1) When trying something new, how comfortable are you with uncertainty?</label>
+          <input type="number" name="risk" min="1" max="5" required>
+        </div>
 
-  <label>4) How do you usually make decisions?</label>
- 
-  <input type="number" name="analytical" min="1" max="5" required><br><br>
+        <div class="question">
+          <label>2) How important is staying within a budget for this decision?</label>
+          <input type="number" name="budget" min="1" max="5" required>
+        </div>
 
-  <label>5) How much do you value convenience over performance/quality?</label>
- 
-  <input type="number" name="convenience" min="1" max="5" required><br><br>
+        <div class="question">
+          <label>3) How much do long-term benefits matter more than short-term comfort?</label>
+          <input type="number" name="long_term" min="1" max="5" required>
+        </div>
 
-  <button type="submit">Continue</button>
-</form>
+        <div class="question">
+          <label>4) How do you usually make decisions?</label>
+          <input type="number" name="analytical" min="1" max="5" required>
+        </div>
+
+        <div class="question">
+          <label>5) How much do you value convenience over performance/quality?</label>
+          <input type="number" name="convenience" min="1" max="5" required>
+        </div>
+
+        <button type="submit" class="quiz-btn">Continue</button>
+
+      </form>
+
+    </div>
+  </div>
+
+</body>
+</html>
