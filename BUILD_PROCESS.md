@@ -74,3 +74,85 @@ If a profile exists → the user is redirected to the **dashboard.**
 
 If not → the user is redirected to the **quiz page**.
 
+
+**Day #3 [26/02/2026]**
+
+Architectural diagram for score calculation :
+
+
+
+<img width="2060" height="426" alt="mermaid-diagram" src="https://github.com/user-attachments/assets/a617743d-889b-49d9-af46-1371f3d99098" />
+
+
+
+First, the base weights from the personality quiz are normalized so that:
+
+
+Sum of w_j = 1
+
+
+
+This ensures that the total importance across all criteria equals 1.
+
+
+
+When the user enters a decision problem, the LLM is used only to extract structured details. It does not make the decision.
+
+
+
+Next, I construct a decision matrix:
+
+
+
+**X = [x_ij]**
+
+
+
+where:
+
+
+x_ij = value of option i under criterion j
+
+
+
+Since different criteria may use different units (price, rating, performance), I normalize them to a 0–1 scale.
+
+
+
+For benefit criteria (higher is better):
+
+
+
+**r_ij = (x_ij − min(x_j)) / (max(x_j) − min(x_j))**
+
+
+
+For cost criteria (lower is better):
+
+
+
+**r_ij = (max(x_j) − x_ij) / (max(x_j) − min(x_j))**
+
+
+
+After normalization, all values lie between 0 and 1.
+
+
+
+Finally, the score for each option is calculated as:
+
+
+
+
+S_i = Sum (w_j × r_ij)
+
+
+
+
+
+
+Final Score = Add up (Weight × Normalized Value)
+
+
+
+The option with the highest score is selected and displayed along with the reason for choosing.
