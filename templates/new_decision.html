@@ -1,21 +1,40 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>New Decision</title>
-</head>
-<body>
+{% if decision_question %}
+  <p><b>Decision:</b> {{ decision_question }}</p>
+{% endif %}
 
-  <h2>Start a New Decision</h2>
+<h2>Create a Decision</h2>
+<p>Enter 2–3 options. Give each option a score (1–10) for each criterion.</p>
 
-  <form method="POST">
-    <label>What decision are you trying to make?</label><br><br>
-    <input type="text" name="question" required style="width:300px;"><br><br>
+<form method="POST" action="{{ url_for('new_decision') }}">
+  {% for i in [1,2,3] %}
+  <fieldset style="margin-bottom:16px; padding:12px;">
+    <legend>Option {{ i }}</legend>
 
-    <button type="submit">Continue</button>
-  </form>
+    <label>Option name</label><br>
+    <input type="text" name="name{{ i }}" placeholder="e.g., Option {{ i }}"><br><br>
 
-  <br>
-  <a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+    <label>Risk (1-10)</label><br>
+    <input type="number" name="risk{{ i }}" min="1" max="10" step="1"><br><br>
 
-</body>
-</html>
+    <label>Budget / Cost-fit (1-10)</label><br>
+    <input type="number" name="budget{{ i }}" min="1" max="10" step="1"><br><br>
+
+    <label>Long-term value (1-10)</label><br>
+    <input type="number" name="long_term{{ i }}" min="1" max="10" step="1"><br><br>
+
+    <label>Performance / Quality (1-10)</label><br>
+    <input type="number" name="analytical{{ i }}" min="1" max="10" step="1"><br><br>
+
+    <label>Convenience (1-10)</label><br>
+    <input type="number" name="convenience{{ i }}" min="1" max="10" step="1"><br><br>
+  </fieldset>
+  {% endfor %}
+
+  <button type="submit">Evaluate</button>
+</form>
+
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <ul>{% for m in messages %}<li>{{ m }}</li>{% endfor %}</ul>
+  {% endif %}
+{% endwith %}

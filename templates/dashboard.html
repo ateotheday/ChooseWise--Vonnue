@@ -1,47 +1,24 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Dashboard</title>
-</head>
-<body>
+<h2>Dashboard</h2>
+<p>Hi {{ name }} 👋</p>
 
-  <h2>Welcome, {{ name }} 👋</h2>
+{% if profile %}
+  <h3>Your profile</h3>
+  <ul>
+    <li>Risk: {{ profile["risk"] }}</li>
+    <li>Budget: {{ profile["budget"] }}</li>
+    <li>Long-term: {{ profile["long_term"] }}</li>
+    <li>Analytical: {{ profile["analytical"] }}</li>
+    <li>Convenience: {{ profile["convenience"] }}</li>
+  </ul>
+{% else %}
+  <p>No profile found. Please take the quiz.</p>
+{% endif %}
 
-  {% if profile %}
-    <h3>Your saved preferences</h3>
+<a href="{{ url_for('decision') }}">Start a new decision</a> |
+<a href="{{ url_for('logout') }}">Logout</a>
 
-    <ul>
-      <li>Risk tolerance: {{ profile["risk"] }}</li>
-      <li>Budget sensitivity: {{ profile["budget"] }}</li>
-      <li>Long-term focus: {{ profile["long_term"] }}</li>
-      <li>Decision style (Analytical): {{ profile["analytical"] }}</li>
-      <li>Convenience vs Performance: {{ profile["convenience"] }}</li>
-    </ul>
-
-    <br>
-
-    <!-- Main Action -->
-    <a href="{{ url_for('new_decision') }}">
-      <button>Start New Decision</button>
-    </a>
-
-    <br><br>
-
-  
-    
-
-    <br><br>
-
-    <a href="{{ url_for('logout') }}">
-      <button>Logout</button>
-    </a>
-
-  {% else %}
-    <h3>You haven’t completed the quiz yet ❗</h3>
-    <a href="{{ url_for('quiz') }}">
-      <button>Take Quiz</button>
-    </a>
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <ul>{% for m in messages %}<li>{{ m }}</li>{% endfor %}</ul>
   {% endif %}
-
-</body>
-</html>
+{% endwith %}

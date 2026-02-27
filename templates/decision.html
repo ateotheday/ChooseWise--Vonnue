@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Decision UI (Prototype)</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="wrap">
+    <div class="title">
+      <h1>Decision UI Prototype</h1>
+      <div class="tag">Single-page flow</div>
+    </div>
+
+    <!-- DECISION -->
+    <div class="card" id="decisionCard">
+      <div class="sectionHead">
+        <h2>1) Enter decision</h2>
+        <div class="row">
+          <button class="btn" id="lockDecisionBtn">
+            <span class="icon">✓</span> Lock Decision
+          </button>
+        </div>
+      </div>
+
+      <div id="decisionInputWrap">
+        <label for="decisionInput">Decision statement</label>
+        <textarea id="decisionInput" placeholder="Example: Should I buy Laptop A or Laptop B for ML and coding under a budget of 60k?"></textarea>
+        <div class="hint">After locking, the text becomes copyable and non-editable (no edit button for now).</div>
+      </div>
+
+      <div id="decisionLockedWrap" style="display:none;">
+        <label>Locked decision (copyable)</label>
+        <div class="lockedBox" id="decisionLockedText"></div>
+      </div>
+    </div>
+
+    <!-- OPTIONS -->
+    <div class="card" id="optionsCard">
+      <div class="sectionHead">
+        <h2>2) Add options</h2>
+        <button class="btn secondary" id="addOptionBtn">
+          <span class="icon">＋</span> Add Option
+        </button>
+      </div>
+
+      <div id="optionManualInputWrap" style="display:none;">
+        <label for="optionManualInput">Add option manually</label>
+        <div class="row">
+          <div class="col">
+            <input class="small" id="optionManualInput" placeholder="Option name (short) e.g., MacBook Air M2" />
+          </div>
+          <div>
+            <button class="btn" id="optionAddConfirmBtn"><span class="icon">＋</span> Add</button>
+          </div>
+        </div>
+        <div class="hint">This input appears right below the decision block, as you requested.</div>
+      </div>
+
+      <div class="pillRow" id="optionsPills"></div>
+
+      <div class="plusLine">
+        <button class="plusBtn" id="plusAddOptionBtn" title="Add another option">+</button>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="row end">
+        <button class="btn ghost" id="submitOptionsBtn">Submit Options</button>
+      </div>
+      <div class="hint" id="optionsStatus">No options submitted yet.</div>
+    </div>
+
+    <!-- CRITERIA -->
+    <div class="card" id="criteriaCard">
+      <div class="sectionHead">
+        <h2>3) Add criteria</h2>
+        <button class="btn secondary" id="addCriteriaBtn">
+          <span class="icon">＋</span> Add Criterion
+        </button>
+      </div>
+
+      <div id="criteriaManualInputWrap" style="display:none;">
+        <label for="criteriaManualInput">Add criterion manually</label>
+        <div class="row">
+          <div class="col">
+            <input class="small" id="criteriaManualInput" placeholder="Criterion name (short) e.g., Battery life" />
+          </div>
+          <div>
+            <button class="btn" id="criteriaAddConfirmBtn"><span class="icon">＋</span> Add</button>
+          </div>
+        </div>
+        <div class="hint">Same interaction pattern as options.</div>
+      </div>
+
+      <div class="pillRow" id="criteriaPills"></div>
+
+      <div class="plusLine">
+        <button class="plusBtn" id="plusAddCriteriaBtn" title="Add another criterion">+</button>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="row end">
+        <button class="btn ghost" id="submitCriteriaBtn">Submit Criteria</button>
+      </div>
+      <div class="hint" id="criteriaStatus">No criteria submitted yet.</div>
+    </div>
+
+    <!-- FINAL -->
+    <div class="card">
+      <div class="sectionHead">
+        <h2>4) Final submit</h2>
+      </div>
+      <div class="row between">
+        <div class="hint" id="finalHint">Lock decision → Add options → Add criteria → Final submit.</div>
+        <button class="btn" id="finalSubmitBtn">
+          <span class="icon">→</span> Final Submit
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL -->
+  <div class="modalBackdrop" id="modalBackdrop">
+    <div class="modal">
+      <h3 id="modalTitle">Add</h3>
+      <p id="modalDesc">Choose how you want to add.</p>
+      <div class="grid">
+        <div class="choice" id="chooseManual">
+          <div class="t"><span class="icon">✎</span> Add manually</div>
+          <p class="d">Show a small text box on the same page to type a short name.</p>
+        </div>
+        <div class="choice" id="chooseSystem">
+          <div class="t"><span class="icon">⚙</span> Use system option</div>
+          <p class="d">Prototype placeholder: it will add sample suggestions (no backend yet).</p>
+        </div>
+      </div>
+      <div class="modalFooter">
+        <button class="btn secondary" id="closeModalBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast">
+    <div class="dot"></div>
+    <div id="toastText">Copied</div>
+  </div>
+
+  <script src="{{ url_for('static', filename='decision.js') }}"></script>
+</body>
+</html>
