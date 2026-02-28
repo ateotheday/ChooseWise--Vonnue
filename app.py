@@ -1,15 +1,79 @@
-#from scoring import normalize_profile, rank_options
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 import os
+import json
 from functools import wraps
+import requests
+import re
 
 app = Flask(__name__)
 app.secret_key = "change_this_to_a_random_secret"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "app.db")
+
+# ----------------------------
+# OLLAMA (LOCAL LLM EXTRACTION)
+# ----------------------------
+OLLAMA_URL = "http://localhost:11434/api/generate"
+OLLAMA_MODEL = "llama3"
+def extract_decision_details(question: str) -> dict:
+    prompt = f"""You are an information extraction engine.
+Return ONLY valid minified JSON. No explanations. No markdown. No code fences.
+
+Schema:
+{{"decision":string|null,"decision_type":string|null,"goal":string|null,"constraints":string[],"preferences":string[],"entities":string[],"time_horizon":string|null,"risk_level":string|null}}
+
+Rules:
+- decision = short description of the choice (e.g., "confess feelings", "choose laptop", "gate vs placements")
+- decision_type = one of: ["relationship","career","education","purchase","health","finance","travel","other"]
+- If uncertain, use "other".
+- Do not guess missing values.
+- constraints, preferences, and entities must ALWAYS be arrays (possibly empty).
+
+Text: {question}"""
+    try:
+        r = requests.post(
+            OLLAMA_URL,
+            json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False},
+            timeout=60
+        )
+        r.raise_for_status()
+        text = (r.json().get("response") or "").strip()
+
+        # First try: direct JSON
+        try:
+            parsed = json.loads(text)
+        except Exception:
+            # Fallback: extract first JSON object in the output
+            m = re.search(r"\{.*\}", text, re.DOTALL)
+            if not m:
+                raise ValueError("No JSON found in model output")
+            parsed = json.loads(m.group(0))
+
+        # Safety defaults (never crash)
+        if parsed.get("constraints") is None: parsed["constraints"] = []
+        if parsed.get("preferences") is None: parsed["preferences"] = []
+        if parsed.get("entities") is None: parsed["entities"] = []
+
+        for k in ["decision_type", "goal", "time_horizon", "risk_level"]:
+            if k not in parsed:
+                parsed[k] = None
+
+        return parsed
+
+    except Exception as e:
+        print("OLLAMA ERROR:", e)
+        return {
+            "decision_type": None,
+            "goal": None,
+            "constraints": [],
+            "preferences": [],
+            "entities": [],
+            "time_horizon": None,
+            "risk_level": None
+        }
 
 
 # ----------------------------
@@ -35,7 +99,6 @@ def init_db():
     )
     """)
 
-    # profiles table for saving the user profile data from the quiz
     cur.execute("""
     CREATE TABLE IF NOT EXISTS profiles (
         user_id INTEGER PRIMARY KEY,
@@ -54,10 +117,17 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
         question TEXT NOT NULL,
+        extracted_context_json TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(user_id) REFERENCES users(id)
     )
     """)
+
+    # migration for older DBs
+    try:
+        cur.execute("ALTER TABLE decisions ADD COLUMN extracted_context_json TEXT")
+    except sqlite3.OperationalError:
+        pass
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS options (
@@ -65,6 +135,16 @@ def init_db():
         decision_id INTEGER NOT NULL,
         name TEXT NOT NULL,
         source TEXT DEFAULT 'manual',
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(decision_id) REFERENCES decisions(id)
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS criteria (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        decision_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(decision_id) REFERENCES decisions(id)
     )
@@ -79,16 +159,6 @@ def init_db():
         FOREIGN KEY(option_id) REFERENCES options(id)
     )
     """)
-    #criteria table
-    cur.execute("""
-CREATE TABLE IF NOT EXISTS criteria (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    decision_id INTEGER NOT NULL,
-    name TEXT NOT NULL,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(decision_id) REFERENCES decisions(id)
-)
-""")
 
     conn.commit()
     conn.close()
@@ -185,48 +255,7 @@ def login():
     if prof:
         return redirect(url_for("dashboard"))
     return redirect(url_for("quiz"))
-# New route to handle decision submission from decision UI
-@app.route("/decision/submit", methods=["POST"])
-@login_required
-def decision_submit():
-    data = request.get_json(silent=True) or {}
 
-    question = (data.get("question") or "").strip()
-    options_list = data.get("options") or []
-    criteria_list = data.get("criteria") or []
-
-    if not question:
-        return {"ok": False, "error": "Missing question"}, 400
-    if len(options_list) < 2:
-        return {"ok": False, "error": "Add at least 2 options"}, 400
-    if len(criteria_list) < 1:
-        return {"ok": False, "error": "Add at least 1 criterion"}, 400
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        "INSERT INTO decisions (user_id, question) VALUES (?, ?)",
-        (session["user_id"], question)
-    )
-    decision_id = cur.lastrowid
-
-    for opt in options_list:
-        cur.execute(
-            "INSERT INTO options (decision_id, name, source) VALUES (?, ?, ?)",
-            (decision_id, opt, "manual")
-        )
-
-    for c in criteria_list:
-        cur.execute(
-            "INSERT INTO criteria (decision_id, name) VALUES (?, ?)",
-            (decision_id, c)
-        )
-
-    conn.commit()
-    conn.close()
-
-    return {"ok": True, "decision_id": decision_id}
 
 @app.route("/logout")
 def logout():
@@ -247,11 +276,7 @@ def dashboard():
     ).fetchone()
     conn.close()
 
-    return render_template(
-        "dashboard.html",
-        name=session.get("user_name"),
-        profile=profile
-    )
+    return render_template("dashboard.html", name=session.get("user_name"), profile=profile)
 
 
 @app.route("/quiz", methods=["GET", "POST"])
@@ -297,86 +322,86 @@ def quiz():
 
 
 # ----------------------------
-# ROUTES: DECISION MAKING
+# ROUTES: DECISION UI
 # ----------------------------
-print("DB PATH:", DB_PATH)
-
-# UI-only route (single-page decision UI)
 @app.route("/decision", methods=["GET"])
 @login_required
 def decision():
     return render_template("decision.html")
 
 
-# --- Keeping your old scoring flow routes (not used by /decision now, but kept) ---
-
-@app.route("/new-decision", methods=["GET", "POST"])
+# ----------------------------
+# API: SAVE DECISION (called by decision.js)
+# ----------------------------
+@app.route("/decision/submit", methods=["POST"])
 @login_required
-def new_decision():
-    if request.method == "GET":
-        decision_question = session.get("decision_question")
-        return render_template("new_decision.html", decision_question=decision_question)
+def decision_submit():
+    data = request.get_json(silent=True) or {}
 
-    options = []
-    for i in range(1, 4):
-        name = (request.form.get(f"name{i}") or "").strip()
-        if not name:
-            continue
+    question = (data.get("question") or "").strip()
+    options_list = data.get("options") or []
+    criteria_list = data.get("criteria") or []
 
-        scores = {
-            "risk": int(request.form.get(f"risk{i}", 0)),
-            "budget": int(request.form.get(f"budget{i}", 0)),
-            "long_term": int(request.form.get(f"long_term{i}", 0)),
-            "analytical": int(request.form.get(f"analytical{i}", 0)),
-            "convenience": int(request.form.get(f"convenience{i}", 0)),
-        }
+    if not question:
+        return {"ok": False, "error": "Missing question"}, 400
+    if len(options_list) < 2:
+        return {"ok": False, "error": "Add at least 2 options"}, 400
+    if len(criteria_list) < 1:
+        return {"ok": False, "error": "Add at least 1 criterion"}, 400
 
-        if any(v < 1 or v > 10 for v in scores.values()):
-            flash("Option scores must be between 1 and 10.")
-            decision_question = session.get("decision_question")
-            return render_template("new_decision.html", decision_question=decision_question)
+    extracted = extract_decision_details(question)
+    print("EXTRACTED RESULT:", extracted)
 
-        options.append({"name": name, "scores": scores})
+    extracted_json = json.dumps(extracted, ensure_ascii=False)
 
-    if len(options) < 2:
-        flash("Please enter at least 2 options.")
-        decision_question = session.get("decision_question")
-        return render_template("new_decision.html", decision_question=decision_question)
-
-    session["current_options"] = options
-    return redirect(url_for("evaluate_dynamic"))
-
-
-@app.route("/evaluate-dynamic")
-@login_required
-def evaluate_dynamic():
     conn = get_db()
-    profile = conn.execute(
-        "SELECT risk, budget, long_term, analytical, convenience FROM profiles WHERE user_id = ?",
-        (session["user_id"],)
+    cur = conn.cursor()
+
+    cur.execute(
+        "INSERT INTO decisions (user_id, question, extracted_context_json) VALUES (?, ?, ?)",
+        (session["user_id"], question, extracted_json)
+    )
+    decision_id = cur.lastrowid
+
+    for opt in options_list:
+        cur.execute(
+            "INSERT INTO options (decision_id, name, source) VALUES (?, ?, ?)",
+            (decision_id, opt, "manual")
+        )
+
+    for c in criteria_list:
+        cur.execute(
+            "INSERT INTO criteria (decision_id, name) VALUES (?, ?)",
+            (decision_id, c)
+        )
+
+    conn.commit()
+    conn.close()
+
+    return {"ok": True, "decision_id": decision_id}
+
+
+# OPTIONAL: quick debug endpoint to see extracted JSON
+@app.route("/decision/<int:decision_id>/debug", methods=["GET"])
+@login_required
+def decision_debug(decision_id):
+    conn = get_db()
+    row = conn.execute(
+        "SELECT question, extracted_context_json FROM decisions WHERE id = ? AND user_id = ?",
+        (decision_id, session["user_id"])
     ).fetchone()
     conn.close()
 
-    if not profile:
-        return redirect(url_for("quiz"))
+    if not row:
+        return "Not found", 404
 
-    options = session.get("current_options")
-    if not options:
-        flash("No options found. Create a decision first.")
-        return redirect(url_for("new_decision"))
-
-    weights = normalize_profile(profile)
-    ranked = rank_options(options, weights)
-    decision_question = session.get("decision_question")
-
-    return render_template(
-        "results.html",
-        weights=weights,
-        ranked=ranked,
-        decision_question=decision_question
-    )
+    return {
+        "question": row["question"],
+        "extracted": json.loads(row["extracted_context_json"] or "{}")
+    }
 
 
 if __name__ == "__main__":
     init_db()
+    print("DB PATH:", DB_PATH)
     app.run(debug=True)

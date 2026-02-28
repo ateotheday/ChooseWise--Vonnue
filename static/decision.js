@@ -5,7 +5,7 @@ let criteria = [];
 let optionsSubmitted = false;
 let criteriaSubmitted = false;
 
-let modalMode = null; // "option" | "criteria"
+let modalMode = null;
 
 function showToast(msg){
   $("toastText").textContent = msg;
@@ -84,7 +84,6 @@ function addSystemSuggestions(mode){
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  // Decision lock
   $("lockDecisionBtn").addEventListener("click", () => {
     const text = $("decisionInput").value.trim();
     if(!text){
@@ -116,13 +115,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 0);
   });
 
-  // Modal open buttons
   $("addOptionBtn").addEventListener("click", () => openModal("option"));
   $("plusAddOptionBtn").addEventListener("click", () => openModal("option"));
   $("addCriteriaBtn").addEventListener("click", () => openModal("criteria"));
   $("plusAddCriteriaBtn").addEventListener("click", () => openModal("criteria"));
 
-  // Modal choices
   $("chooseManual").addEventListener("click", () => {
     closeModal();
     if(modalMode === "option"){
@@ -144,11 +141,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if(e.target === $("modalBackdrop")) closeModal();
   });
 
-  // Manual add confirm
   $("optionAddConfirmBtn").addEventListener("click", () => addManualItem("option", $("optionManualInput").value));
   $("criteriaAddConfirmBtn").addEventListener("click", () => addManualItem("criteria", $("criteriaManualInput").value));
 
-  // Enter key support
   $("optionManualInput").addEventListener("keydown", (e) => {
     if(e.key === "Enter"){
       e.preventDefault();
@@ -163,7 +158,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Delete pills
   document.addEventListener("click", (e) => {
     const x = e.target;
     if(x && x.classList && x.classList.contains("x")){
@@ -182,15 +176,15 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Submit buttons
+  //  MUST BE 2 OPTIONS (match backend)
   $("submitOptionsBtn").addEventListener("click", () => {
-    if(options.length < 1){
-      showToast("Add at least 1 option");
+    if(options.length < 2){
+      showToast("Add at least 2 options");
       return;
     }
     optionsSubmitted = true;
-    $("optionsStatus").textContent = `Options submitted ✅ (${options.length})`;
-    showToast("Options submitted ✅");
+    $("optionsStatus").textContent = `Options submitted  (${options.length})`;
+    showToast("Options submitted ");
   });
 
   $("submitCriteriaBtn").addEventListener("click", () => {
@@ -199,11 +193,11 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     criteriaSubmitted = true;
-    $("criteriaStatus").textContent = `Criteria submitted ✅ (${criteria.length})`;
-    showToast("Criteria submitted ✅");
+    $("criteriaStatus").textContent = `Criteria submitted  (${criteria.length})`;
+    showToast("Criteria submitted ");
   });
 
-  // Final submit (SAVES TO BACKEND)
+  //  Final submit (SAVES TO BACKEND)
   $("finalSubmitBtn").addEventListener("click", async () => {
     if ($("decisionLockedWrap").style.display === "none") {
       showToast("Lock the decision first");
@@ -218,8 +212,11 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const question = $("decisionLockedText").textContent.replace("⧉", "").trim();
+    const question = $("decisionInput").value.trim();
     const payload = { question, options, criteria };
+
+    $("finalHint").textContent = "Saving...";
+    $("finalSubmitBtn").disabled = true;
 
     try {
       const res = await fetch("/decision/submit", {
@@ -228,17 +225,33 @@ document.addEventListener("DOMContentLoaded", () => {
         body: JSON.stringify(payload),
       });
 
-      const out = await res.json();
+      const ct = res.headers.get("content-type") || "";
+      let out = null;
+
+      if(ct.includes("application/json")){
+        out = await res.json();
+      } else {
+        const txt = await res.text();
+        throw new Error(txt.slice(0, 200));
+      }
 
       if (!res.ok || !out.ok) {
         showToast(out.error || "Submit failed");
+        $("finalHint").textContent = out.error || "Submit failed";
         return;
       }
 
-      showToast("Saved ✅");
-      $("finalHint").textContent = `Saved ✅ Decision ID: ${out.decision_id}`;
+      showToast("Saved ");
+      $("finalHint").textContent = `Saved  Decision ID: ${out.decision_id}`;
+
+      // Optional: open debug endpoint
+      // window.location.href = `/decision/${out.decision_id}/debug`;
+
     } catch (err) {
-      showToast("Network error");
+      showToast("Error while saving");
+      $("finalHint").textContent = String(err);
+    } finally {
+      $("finalSubmitBtn").disabled = false;
     }
   });
 
