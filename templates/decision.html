@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Decision UI (Prototype)</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <title>Make your decision!</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
   <div class="wrap">
     <div class="title">
-      <h1>Decision UI Prototype</h1>
-      <div class="tag">Single-page flow</div>
+      <h1>chooseWise</h1>
+      <div class="tag"></div>
     </div>
 
     <!-- DECISION -->
@@ -27,11 +27,11 @@
       <div id="decisionInputWrap">
         <label for="decisionInput">Decision statement</label>
         <textarea id="decisionInput" placeholder="Example: Should I buy Laptop A or Laptop B for ML and coding under a budget of 60k?"></textarea>
-        <div class="hint">After locking, the text becomes copyable and non-editable (no edit button for now).</div>
+        <div class="hint"></div>
       </div>
 
       <div id="decisionLockedWrap" style="display:none;">
-        <label>Locked decision (copyable)</label>
+        <label></label>
         <div class="lockedBox" id="decisionLockedText"></div>
       </div>
     </div>
@@ -55,7 +55,7 @@
             <button class="btn" id="optionAddConfirmBtn"><span class="icon">＋</span> Add</button>
           </div>
         </div>
-        <div class="hint">This input appears right below the decision block, as you requested.</div>
+        <div class="hint"></div>
       </div>
 
       <div class="pillRow" id="optionsPills"></div>
@@ -91,7 +91,7 @@
             <button class="btn" id="criteriaAddConfirmBtn"><span class="icon">＋</span> Add</button>
           </div>
         </div>
-        <div class="hint">Same interaction pattern as options.</div>
+        <div class="hint"></div>
       </div>
 
       <div class="pillRow" id="criteriaPills"></div>
@@ -114,9 +114,9 @@
         <h2>4) Final submit</h2>
       </div>
       <div class="row between">
-        <div class="hint" id="finalHint">Lock decision → Add options → Add criteria → Final submit.</div>
+        <div class="hint" id="finalHint"></div>
         <button class="btn" id="finalSubmitBtn">
-          <span class="icon">→</span> Final Submit
+          <span class="icon">→</span>SUBMIT
         </button>
       </div>
     </div>
@@ -130,11 +130,11 @@
       <div class="grid">
         <div class="choice" id="chooseManual">
           <div class="t"><span class="icon">✎</span> Add manually</div>
-          <p class="d">Show a small text box on the same page to type a short name.</p>
+          <p class="d"></p>
         </div>
         <div class="choice" id="chooseSystem">
           <div class="t"><span class="icon">⚙</span> Use system option</div>
-          <p class="d">Prototype placeholder: it will add sample suggestions (no backend yet).</p>
+          <p class="d"></p>
         </div>
       </div>
       <div class="modalFooter">

@@ -107,7 +107,7 @@ document.addEventListener("DOMContentLoaded", () => {
           e.stopPropagation();
           try{
             await navigator.clipboard.writeText(text);
-            showToast("Decision copied ✅");
+            showToast("Decision copied to clipboard");
           }catch{
             showToast("Copy failed");
           }
@@ -182,7 +182,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Submit buttons (UI-only state)
+  // Submit buttons
   $("submitOptionsBtn").addEventListener("click", () => {
     if(options.length < 1){
       showToast("Add at least 1 option");
@@ -203,26 +203,43 @@ document.addEventListener("DOMContentLoaded", () => {
     showToast("Criteria submitted ✅");
   });
 
-  $("finalSubmitBtn").addEventListener("click", () => {
-    if($("decisionLockedWrap").style.display === "none"){
+  // Final submit (SAVES TO BACKEND)
+  $("finalSubmitBtn").addEventListener("click", async () => {
+    if ($("decisionLockedWrap").style.display === "none") {
       showToast("Lock the decision first");
       return;
     }
-    if(!optionsSubmitted){
+    if (!optionsSubmitted) {
       showToast("Submit options first");
       return;
     }
-    if(!criteriaSubmitted){
+    if (!criteriaSubmitted) {
       showToast("Submit criteria first");
       return;
     }
 
-    const decisionText = $("decisionLockedText").textContent.replace("⧉","").trim();
-    const payload = { decision: decisionText, options, criteria };
+    const question = $("decisionLockedText").textContent.replace("⧉", "").trim();
+    const payload = { question, options, criteria };
 
-    console.log("FINAL SUBMIT PAYLOAD:", payload);
-    showToast("Final submitted ✅ (check console)");
-    $("finalHint").textContent = "Final submitted ✅ (payload logged in console).";
+    try {
+      const res = await fetch("/decision/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const out = await res.json();
+
+      if (!res.ok || !out.ok) {
+        showToast(out.error || "Submit failed");
+        return;
+      }
+
+      showToast("Saved ✅");
+      $("finalHint").textContent = `Saved ✅ Decision ID: ${out.decision_id}`;
+    } catch (err) {
+      showToast("Network error");
+    }
   });
 
   renderPills();

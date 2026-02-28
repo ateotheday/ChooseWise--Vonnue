@@ -1,4 +1,4 @@
-from scoring import normalize_profile, rank_options
+#from scoring import normalize_profile, rank_options
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
@@ -79,6 +79,16 @@ def init_db():
         FOREIGN KEY(option_id) REFERENCES options(id)
     )
     """)
+    #criteria table
+    cur.execute("""
+CREATE TABLE IF NOT EXISTS criteria (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    decision_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(decision_id) REFERENCES decisions(id)
+)
+""")
 
     conn.commit()
     conn.close()
@@ -175,7 +185,48 @@ def login():
     if prof:
         return redirect(url_for("dashboard"))
     return redirect(url_for("quiz"))
+# New route to handle decision submission from decision UI
+@app.route("/decision/submit", methods=["POST"])
+@login_required
+def decision_submit():
+    data = request.get_json(silent=True) or {}
 
+    question = (data.get("question") or "").strip()
+    options_list = data.get("options") or []
+    criteria_list = data.get("criteria") or []
+
+    if not question:
+        return {"ok": False, "error": "Missing question"}, 400
+    if len(options_list) < 2:
+        return {"ok": False, "error": "Add at least 2 options"}, 400
+    if len(criteria_list) < 1:
+        return {"ok": False, "error": "Add at least 1 criterion"}, 400
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        "INSERT INTO decisions (user_id, question) VALUES (?, ?)",
+        (session["user_id"], question)
+    )
+    decision_id = cur.lastrowid
+
+    for opt in options_list:
+        cur.execute(
+            "INSERT INTO options (decision_id, name, source) VALUES (?, ?, ?)",
+            (decision_id, opt, "manual")
+        )
+
+    for c in criteria_list:
+        cur.execute(
+            "INSERT INTO criteria (decision_id, name) VALUES (?, ?)",
+            (decision_id, c)
+        )
+
+    conn.commit()
+    conn.close()
+
+    return {"ok": True, "decision_id": decision_id}
 
 @app.route("/logout")
 def logout():
