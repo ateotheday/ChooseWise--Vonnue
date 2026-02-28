@@ -169,12 +169,65 @@ I worked on the Decision page UI.
 Today,
 
 
-I worked on the decision page itself.
+I worked on the decision page. 
 
 
 The decision table was made for storing the decision text by the user, options, and criteria.
 
 
-I installed ollama for using a model for extracting the important details from the decision text.
+I installed ollama to use a model for extracting the important details from the decision text.
+
+### Key Work Completed
 
 
+- Integrated a local LLM pipeline using **Ollama (llama3)** for structured extraction of decision context.
+
+- Implemented schema-constrained JSON extraction to ensure:
+  
+  - No hallucinated fields
+ 
+    
+  - Safe parsing 
+
+- Connected the extraction layer to the `/decision/submit` route so that every decision submission now:
+
+  
+  1. Extracts structured metadata
+ 
+
+  2. Stores it in the database
+ 
+ 
+  3. Persists user-defined options and criteria
+ 
+  
+
+### Architectural Insight
+
+The LLM is used strictly for structured parsing of user input.  
+
+
+Final scoring and ranking remain deterministic and rule-based to avoid black-box decision-making.
+
+
+So, it extracts only important details...
+
+
+**{
+  "extracted": {
+    "constraints": [],
+    "decision": "",
+    "decision_type": 
+    "entities": 
+    "goal": 
+    "preferences": 
+    "risk_level": 
+    "time_horizon":
+  },
+  "question": "-"
+}**
+
+This is the final extracted file. It includes a decision type and some other constraint details extracted from the user's decision text.
+
+
+**Issues encountered:** the modelintroduces too much latency during extraction.
