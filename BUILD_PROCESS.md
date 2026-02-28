@@ -156,3 +156,25 @@ Final Score = Add up (Weight × Normalized Value)
 
 
 The option with the highest score is selected and displayed along with the reason for choosing.
+
+
+
+**Day #4 [27/02/2026]**
+
+
+I worked on the Decision page UI.
+
+**Day #5 [28/02/2026]**
+
+Today,
+
+
+I worked on the decision page itself.
+
+
+The decision table was made for storing the decision text by the user, options, and criteria.
+
+
+I installed ollama for using a model for extracting the important details from the decision text.
+
+
