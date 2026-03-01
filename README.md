@@ -1,3 +1,17 @@
+**CHOOSEWISE**- A Decision-making system
+
+
+**demo video:**
+
+
+https://github.com/user-attachments/assets/26d4042a-e37c-4cca-b0e4-6b06c36fa6c0
+
+
+**final result interface:**
+
+
+<img width="1917" height="934" alt="Screenshot 2026-03-01 215850" src="https://github.com/user-attachments/assets/1d9708c5-5a0c-44d5-871d-3c699776863a" />
+
 **1. My Understanding of the Problem**
 
 
@@ -46,7 +60,10 @@ These are used for default weight assignment.
 
 
 
-**(1)** When the user enters the decision question :
+**(1)**
+
+
+When the user enters the decision question :
 
 
 It is passed to an LLM only for extracting the important details required for later evaluation. 
@@ -63,7 +80,7 @@ Similarly, for criteria selection, the user can either define criteria manually 
 
 This feature is included to provide convenience.
 
-
+//have not implemented in the final submitted product.
 
 
 **(2)**
@@ -387,6 +404,9 @@ http://127.0.0.1:5000
 
 
 **7. What I would improve with time**
+
+//the current system might fall short to make correct decisions,
+this can be made better by iproving the Knowledge base and also by using a model using API rather than urnning i tlocally.
 
 
 If given additional time, I would:
