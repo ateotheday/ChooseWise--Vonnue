@@ -1,3 +1,71 @@
+**2. Evolution of Thinking**
+
+
+Phase 1: Pure Deterministic System
+
+
+My early assumption was:
+
+
+“All decision-making can be handled using structured input and scoring.”
+
+
+However, I quickly realized:
+
+
+Users often enter vague or unstructured questions.
+
+
+Real-world decisions require contextual knowledge.
+
+
+Manually defining all criteria per decision is inefficient.
+
+
+This led me to integrate LLM-based extraction.
+
+
+
+Phase 2: Full LLM-Based Decision Making **(Rejected)**
+
+
+
+At one point, I considered letting the LLM:
+
+
+
+Generate options.
+
+Generate criteria.
+
+Rank options.
+
+Provide reasoning.
+
+
+This approach felt powerful but not reliable.
+
+
+
+Phase 3: Hybrid Architecture (Final Design)
+
+
+I refined the architecture into three layers:
+
+
+**LLM → Extraction Only**
+
+
+
+**RAG → Domain Knowledge Retrieval using pre-defined Knowledge bases**
+
+
+
+**Engine → Deterministic Scoring after llm parses through the kb**
+
+
+
+
 **day #1  [23/02/2026]**
 
 I initially planned on designing the website by only considering a quiz, which is responsible for all the decisions that the system would make. But later I found it to be too shallow. 
@@ -230,4 +298,216 @@ So, it extracts only important details...
 This is the final extracted file. It includes a decision type and some other constraint details extracted from the user's decision text.
 
 
-**Issues encountered:** the modelintroduces too much latency during extraction.
+**Issues encountered:** The model introduces too much latency during extraction.
+
+
+**#day 6 [01/02/2026]**
+
+Today I worked on the main parts.
+
+-when the user enters a decision text and submits it along with the options and criteria,
+
+The llama model, which runs locally on my device, is given a prompt to return the extracted text from it. It is also told to categorise the decision into a particular decision type.This is already pre-defined and given as prompt to the model. After extracting it gives the reults back as json and is stored with a decision id.
+
+
+
+issues encountered :  Criteria Importance Placement 
+
+Confusion:
+
+
+I was unsure whether to:
+
+
+Collect importance weights for each criteria on a separate page
+
+
+Or collect them directly below the criteria input
+
+
+**Final Decision:**
+
+
+I kept the importance scale on the same page, directly below the criteria.
+
+
+**Reason:**
+
+
+Keeps user context intact
+
+
+Avoids unnecessary page transitions
+
+
+
+
+**2️ .Generic vs Specific RAG Knowledge Base**
+
+
+Initial Idea:
+
+I wanted to build a detailed RAG knowledge base including:
+
+
+
+Specific laptop models
+
+
+
+Detailed specifications
+
+
+
+Product-level comparisons
+
+
+
+However, this created a problem:
+
+
+
+If a user enters:
+
+
+
+“MacBook Pro M3 vs Dell XPS 13”
+
+
+
+And those exact models are not in the KB:
+
+
+
+Retrieval would fail
+
+
+
+Scoring would break
+
+
+
+System becomes hardcoded and fragile
+
+
+
+**Final Decision:**
+
+
+
+Instead of storing product-specific knowledge, I:
+
+
+
+Built **generic domain-based KBs**
+
+
+
+Focused on decision frameworks (e.g., performance, budget, durability)
+
+
+
+Let the LLM reason over user-provided options using domain guidance
+
+
+
+**3️. Why Not Let the User Score Each Option?**
+
+
+Initially, I questioned:
+
+
+If the user is confused, why ask them to score each option?
+
+
+
+If the user already knew how to score each option precisely,
+
+
+Then they wouldn't need the system.
+
+
+
+**Final Approach:**
+
+The retriever extracts domain-relevant criteria.
+
+
+The scoring engine applies weights.
+
+
+The LLM assists in structured evaluation when necessary.
+
+
+
+
+**5️. RAG Retrieval Overhead**
+
+While experimenting with full RAG vectorization:
+
+Embedding creation was computationally heavy
+
+Local **LLM timeouts occurred**
+
+
+Retrieval felt static and hardcoded
+
+I realized full vector-based RAG was unnecessary for the scope.
+
+
+
+Change Made:
+
+Rebranded to:
+
+
+**“LLM-assisted retrieval from structured domain KB”**
+
+
+
+
+**6️. Issue: All Options Ranked as 3**
+
+During testing:
+
+All options received the same score.
+
+Investigation:
+
+Root cause was:
+
+**LLM timeout during extraction**
+
+**Insufficient KB context returned**
+
+Fallback values defaulting to neutral scores
+
+Fixes:
+
+Reduced the extraction prompt size
+
+
+ By,
+   -reducing timeout
+
+   
+   -increasing tokens
+   
+
+
+**Added fallback validation**
+
+
+After optimization, scoring stabilized.
+
+
+
+..... 
+The results are retrieved very slowly
+
+
+
+. This was caused by the extraction and then parsing through the kb.
+
+
+**It was overkill, and could be reduced by combinig both of them into a single stage rather than separately.**
