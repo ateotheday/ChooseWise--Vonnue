@@ -1,5 +1,6 @@
 **1. My Understanding of the Problem**
 
+
 The goal of this assignment was to build a system that helps users make **structured decisions** between multiple options in a rational, explainable, and scalable way.
 
 A web-based application built as part of a take-home assessment conducted by **Vonnue**
@@ -12,6 +13,8 @@ This is a basic implementation of the system I am building :
 
 
 ![USER REGISTRATION](https://github.com/user-attachments/assets/02ef1c92-175b-4203-90f0-d6395655fd70)
+
+
 
 Here,
 The user enters the website, and a small **personality quiz** is taken, which analyzes traits such as :
@@ -31,11 +34,16 @@ The user enters the website, and a small **personality quiz** is taken, which an
  
  -Convenience vs Performance (1–5 scale)
 
+
+
  
 Accordingly, **base weights will be adjusted.**
 
 
+
 These are used for default weight assignment.
+
+
 
 
 **(1)** When the user enters the decision question :
@@ -54,6 +62,9 @@ Similarly, for criteria selection, the user can either define criteria manually 
 
 
 This feature is included to provide convenience.
+
+
+
 
 **(2)**
 
@@ -76,6 +87,10 @@ The processed and normalized matrix is then passed to the weighting and ranking 
 
 
 This is the base idea of the website..
+
+
+
+
 
 **(3)**
 
@@ -103,6 +118,10 @@ If the user manually adjusts weights, the system treats user input as higher pri
 reflects the user’s current intent.
 
 
+
+
+
+
 **(f)**
 
 
@@ -116,6 +135,9 @@ reflects the user’s current intent.
 
  
  The explanation highlights the most influential criteria, the applied weights, and any key trade-offs observed during evaluation. 
+
+
+
 
 
 **2. Assumptions Made**
@@ -152,6 +174,9 @@ The LLM extraction is required to:
 The final recommendation is deterministic and reproducible using weighted scoring logic.
 
 
+
+
+
 **3. Why I structured the solution the way I did**
 
 My solution is to categorize the decision text into  pre-defined categories and have the LLM parse through the custom made Knowledge bases. 
@@ -170,10 +195,14 @@ The scoring engine makes the final decision deterministically.
 
  This was the flow I had in mind.
 
+
+
+
+
 **4.Tradeoffs**
 
 
-Decision : Domain-Based Knowledge Base Structure
+Decision: Domain-Based Knowledge Base Structure
 
 
 knowledgeBaseFiles/
@@ -229,6 +258,9 @@ Transparent, explainable decision process.
 
 
 
+
+
+
 **5. Edge cases considered**
 
 
@@ -266,6 +298,10 @@ User-provided criteria missing
 
 
 → Apply domain default weights
+
+
+
+
 
 
 
@@ -347,6 +383,9 @@ http://127.0.0.1:5000
 
 
 
+
+
+
 **7. What I would improve with time**
 
 
@@ -369,6 +408,10 @@ If given additional time, I would:
 
 
 -Deploy system with Docker for production readiness.
+
+
+
+
 
 
 **8. Future scope**
