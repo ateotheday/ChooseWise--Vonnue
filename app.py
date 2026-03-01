@@ -34,8 +34,12 @@ MATRIX_RETRIES = 2
 
 def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", (s or "").strip().lower())
-
-
+#fallback code..if it fails to fetch reason from the KB
+def fallback_reason(option_name, criterion_name, importance, score, weighted):
+    return (
+        f"Heuristic fallback: '{criterion_name}' was weighted {importance}/5. "
+        f"'{option_name}' scored {score}/5, contributing +{weighted} to the total."
+    )
 def guess_decision_type(question: str) -> str:
     q = (question or "").lower()
     if any(k in q for k in ["job", "government", "govt", "private", "career", "placement", "internship", "salary", "offer"]):
@@ -789,7 +793,7 @@ def decision_debug(decision_id):
     })
 
 
-# ✅✅✅ NEW RESULT PAGE ROUTE
+#  NEW RESULT PAGE ROUTE
 @app.route("/decision/<int:decision_id>/result", methods=["GET"])
 @login_required
 def decision_result(decision_id):

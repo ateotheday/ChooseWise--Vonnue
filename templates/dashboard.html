@@ -1,24 +1,65 @@
-<h2>Dashboard</h2>
-<p>Hi {{ name }} 👋</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
+</head>
 
-{% if profile %}
-  <h3>Your profile</h3>
-  <ul>
-    <li>Risk: {{ profile["risk"] }}</li>
-    <li>Budget: {{ profile["budget"] }}</li>
-    <li>Long-term: {{ profile["long_term"] }}</li>
-    <li>Analytical: {{ profile["analytical"] }}</li>
-    <li>Convenience: {{ profile["convenience"] }}</li>
-  </ul>
-{% else %}
-  <p>No profile found. Please take the quiz.</p>
-{% endif %}
+<body class="sky-quiz">
 
-<a href="{{ url_for('decision') }}">Start a new decision</a> |
-<a href="{{ url_for('logout') }}">Logout</a>
+  <div class="quiz-container">
+    <div class="quiz-card">
 
-{% with messages = get_flashed_messages() %}
-  {% if messages %}
-    <ul>{% for m in messages %}<li>{{ m }}</li>{% endfor %}</ul>
-  {% endif %}
-{% endwith %}
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+        <div>
+          <h2 style="margin:0;">Dashboard ☁️</h2>
+          <p class="subtitle" style="margin:6px 0 0;">Hi {{ name }} 👋</p>
+        </div>
+
+        <a class="btn btn-ghost" href="{{ url_for('logout') }}">Logout</a>
+      </div>
+
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          <div style="margin-top:14px;">
+            {% for m in messages %}
+              <div class="alert">{{ m }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      {% if profile %}
+        <div class="section" style="margin-top:18px;">
+          <h3 style="margin:0 0 10px;">Your profile 🌥️</h3>
+
+          <div class="profile-grid">
+            <div class="pill">Risk: <b>{{ profile["risk"] }}</b></div>
+            <div class="pill">Budget: <b>{{ profile["budget"] }}</b></div>
+            <div class="pill">Long-term: <b>{{ profile["long_term"] }}</b></div>
+            <div class="pill">Analytical: <b>{{ profile["analytical"] }}</b></div>
+            <div class="pill">Convenience: <b>{{ profile["convenience"] }}</b></div>
+          </div>
+        </div>
+      {% else %}
+        <div class="empty">
+          <p style="margin:0;">No profile found ☁️</p>
+          <p class="subtitle" style="margin:8px 0 0;">Please take the quiz first.</p>
+          <div style="margin-top:12px;">
+            <a class="btn" href="{{ url_for('quiz') }}">Take quiz</a>
+          </div>
+        </div>
+      {% endif %}
+
+      <div style="display:flex; gap:10px; margin-top:18px; flex-wrap:wrap;">
+        <a class="btn" href="{{ url_for('decision') }}">Start a new decision</a>
+        <a class="btn btn-ghost" href="{{ url_for('dashboard') }}">Refresh</a>
+      </div>
+
+    </div>
+  </div>
+
+</body>
+</html>

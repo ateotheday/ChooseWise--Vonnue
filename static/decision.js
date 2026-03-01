@@ -255,7 +255,7 @@ document.addEventListener("DOMContentLoaded", () => {
       showToast("Saved ");
       $("finalHint").textContent = `Saved ✅ Decision ID: ${out.decision_id}`;
 
-      // ✅ redirect to result page
+      //  redirect to result page
       window.location.href = out.result_url || `/decision/${out.decision_id}/result`;
 
     } catch (err) {
