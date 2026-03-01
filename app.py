@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 import os
@@ -6,6 +6,7 @@ import json
 from functools import wraps
 import requests
 import re
+import time
 
 from kb_loader import load_kb
 from retriever import retrieve
@@ -24,9 +25,105 @@ KB_DOCS = load_kb("knowledgeBaseFiles")
 OLLAMA_URL = "http://localhost:11434/api/generate"
 OLLAMA_MODEL = "llama3"
 
+EXTRACT_TIMEOUT = 180
+MATRIX_TIMEOUT = 300
 
-def _norm(s):
+EXTRACT_RETRIES = 2
+MATRIX_RETRIES = 2
+
+
+def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", (s or "").strip().lower())
+
+
+def guess_decision_type(question: str) -> str:
+    q = (question or "").lower()
+    if any(k in q for k in ["job", "government", "govt", "private", "career", "placement", "internship", "salary", "offer"]):
+        return "career"
+    if any(k in q for k in ["college", "mtech", "gate", "degree", "course", "study", "iit", "ms ", "mba"]):
+        return "education"
+    if any(k in q for k in ["laptop", "phone", "buy", "purchase", "price", "budget", "specs", "ram", "ssd"]):
+        return "purchase"
+    if any(k in q for k in ["trip", "travel", "vacation", "itinerary"]):
+        return "travel"
+    if any(k in q for k in ["investment", "stocks", "mutual fund", "sip", "loan", "emi", "savings"]):
+        return "finance"
+    if any(k in q for k in ["health", "diet", "workout", "medicine", "sleep"]):
+        return "health"
+    return "other"
+
+
+def pick_scoring_docs(retrieved_docs, question: str, max_docs=2):
+    if not retrieved_docs:
+        return []
+
+    q = (question or "").lower()
+    scored = []
+
+    for d in retrieved_docs:
+        path = (d.get("path") or "").lower()
+        title = (d.get("title") or "").lower()
+        cat = (d.get("category") or "").lower()
+        text = (d.get("text") or "").lower()
+        hint = " ".join([path, title, cat])
+
+        score = 0
+
+        if any(k in q for k in ["govt", "government", "private"]):
+            if "govt_vs_private" in hint or ("government" in hint and "private" in hint):
+                score += 120
+
+        kw = []
+        if "stability" in q or "security" in q:
+            kw += ["stability", "security", "job security"]
+        if "salary" in q or "pay" in q or "package" in q:
+            kw += ["salary", "pay", "compensation", "income"]
+        if "growth" in q or "career" in q:
+            kw += ["growth", "career", "promotion"]
+        if "pressure" in q or "stress" in q:
+            kw += ["pressure", "stress", "work pressure"]
+
+        for w in kw:
+            if w in text:
+                score += 12
+
+        score += min(len(text) // 1000, 5)
+        scored.append((score, d))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    picked = [d for s, d in scored if s > 0][:max_docs]
+    return picked or [retrieved_docs[0]]
+
+
+def safe_json_from_text(text: str) -> dict:
+    t = (text or "").strip()
+    try:
+        return json.loads(t)
+    except Exception:
+        m = re.search(r"\{.*\}", t, re.DOTALL)
+        if not m:
+            return {}
+        try:
+            return json.loads(m.group(0))
+        except Exception:
+            return {}
+
+
+def ollama_generate(prompt: str, timeout: int, retries: int = 0):
+    last_err = None
+    for attempt in range(retries + 1):
+        try:
+            r = requests.post(
+                OLLAMA_URL,
+                json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False},
+                timeout=timeout
+            )
+            r.raise_for_status()
+            return (r.json().get("response") or "").strip()
+        except Exception as e:
+            last_err = e
+            time.sleep(0.8 * (attempt + 1))
+    raise last_err
 
 
 def extract_decision_details(question: str) -> dict:
@@ -37,30 +134,16 @@ Schema:
 {{"decision":string|null,"decision_type":string|null,"goal":string|null,"constraints":string[],"preferences":string[],"entities":string[],"time_horizon":string|null,"risk_level":string|null}}
 
 Rules:
-- decision = short description of the choice (e.g., "confess feelings", "choose laptop", "gate vs placements")
+- decision = short description of the choice (can be the question rephrased)
 - decision_type = one of: ["relationship","career","education","purchase","health","finance","travel","other"]
 - If uncertain, use "other".
-- Do not guess missing values.
 - constraints, preferences, and entities must ALWAYS be arrays (possibly empty).
 
 Text: {question}"""
 
     try:
-        r = requests.post(
-            OLLAMA_URL,
-            json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False},
-            timeout=60
-        )
-        r.raise_for_status()
-        text = (r.json().get("response") or "").strip()
-
-        try:
-            parsed = json.loads(text)
-        except Exception:
-            m = re.search(r"\{.*\}", text, re.DOTALL)
-            if not m:
-                raise ValueError("No JSON found in model output")
-            parsed = json.loads(m.group(0))
+        text = ollama_generate(prompt, timeout=EXTRACT_TIMEOUT, retries=EXTRACT_RETRIES)
+        parsed = safe_json_from_text(text)
 
         if parsed.get("constraints") is None:
             parsed["constraints"] = []
@@ -73,14 +156,23 @@ Text: {question}"""
             if k not in parsed:
                 parsed[k] = None
 
+        if not parsed.get("decision_type"):
+            parsed["decision_type"] = guess_decision_type(question)
+
+        if not parsed.get("decision"):
+            parsed["decision"] = question.strip()
+
+        if not parsed.get("goal"):
+            parsed["goal"] = "Choose the best option based on the user's priorities."
+
         return parsed
 
     except Exception as e:
         print("OLLAMA ERROR (extract):", e)
         return {
-            "decision": None,
-            "decision_type": None,
-            "goal": None,
+            "decision": question.strip(),
+            "decision_type": guess_decision_type(question),
+            "goal": "Choose the best option based on the user's priorities.",
             "constraints": [],
             "preferences": [],
             "entities": [],
@@ -89,10 +181,81 @@ Text: {question}"""
         }
 
 
+def build_kb_context(kb_docs: list[dict], per_doc_chars: int = 900, max_total_chars: int = 1800) -> str:
+    chunks = []
+    total = 0
+    for d in kb_docs:
+        title = d.get("title", "")
+        cat = d.get("category", "")
+        txt = (d.get("text") or "").strip()
+        piece = f"[{cat}] {title}\n{txt[:per_doc_chars]}"
+        if total + len(piece) > max_total_chars:
+            break
+        chunks.append(piece)
+        total += len(piece)
+    return "\n\n---\n\n".join(chunks)
+
+
+def keyword_fallback_scores(question: str, options: list[str], criteria: list[str]) -> list[dict]:
+    q = (question or "").lower()
+
+    criterion_keywords = {
+        "job stability": {
+            "government job": ["permanent", "pension", "job security", "stable", "security"],
+            "private job": ["layoff", "variable", "performance", "unstable", "switch"]
+        },
+        "salary": {
+            "government job": ["fixed", "pay scale", "allowance"],
+            "private job": ["high", "bonus", "package", "hike"]
+        },
+        "growth": {
+            "government job": ["slow", "seniority"],
+            "private job": ["growth", "promotion", "learning", "skill"]
+        },
+        "work life balance": {
+            "government job": ["hours", "balance", "leave"],
+            "private job": ["pressure", "deadline", "overtime"]
+        }
+    }
+
+    out = []
+    for o in options:
+        o_l = o.lower()
+        for c in criteria:
+            c_l = c.lower()
+
+            score = 3
+            reason = "Insufficient KB evidence"
+
+            found = False
+
+            if c_l in criterion_keywords:
+                mapping = criterion_keywords[c_l]
+                for opt_key, kws in mapping.items():
+                    if opt_key in o_l:
+                        hits = sum(1 for kw in kws if kw in q)
+                        if hits >= 2:
+                            score = 4
+                            reason = f"Matched keywords in question for {c}: {', '.join([kw for kw in kws if kw in q])}"
+                        elif hits == 1:
+                            score = 3
+                            reason = f"Matched keyword in question for {c}: {', '.join([kw for kw in kws if kw in q])}"
+                        else:
+                            score = 3
+                            reason = "Insufficient KB evidence"
+                        found = True
+                        break
+
+            if not found:
+                score = 3
+                reason = "Insufficient KB evidence"
+
+            out.append({"option": o, "criterion": c, "score": score, "reason": reason})
+    return out
+
+
 def llm_fill_matrix(question: str, options: list[str], criteria: list[str], kb_docs: list[dict]) -> dict:
-    kb_context = "\n\n---\n\n".join(
-        [f"[{d.get('category','')}] {d.get('title','')}\n{(d.get('text') or '')[:900]}" for d in kb_docs]
-    )
+    kb_context = build_kb_context(kb_docs)
 
     prompt = f"""
 You are a scoring assistant for a transparent decision-support system.
@@ -106,7 +269,6 @@ IMPORTANT RULES:
 - Output MUST include every pair (option, criterion). That means len(Options) * len(Criteria) items.
 
 Score scale: 1 (worst) to 5 (best).
-If KB does not provide enough evidence, return score 3 and reason "Insufficient KB evidence".
 
 Schema:
 {{"scores":[{{"option":string,"criterion":string,"score":int,"reason":string}}]}}
@@ -120,23 +282,16 @@ KB context:
 """.strip()
 
     try:
-        r = requests.post(
-            OLLAMA_URL,
-            json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False},
-            timeout=180
-        )
-        r.raise_for_status()
-        text = (r.json().get("response") or "").strip()
-
+        text = ollama_generate(prompt, timeout=MATRIX_TIMEOUT, retries=MATRIX_RETRIES)
         print("KB CONTEXT LEN:", len(kb_context))
-        print("LLM RAW OUTPUT (first 1200):", text[:1200])
+        print("LLM RAW OUTPUT (first 800):", text[:800])
 
-        m = re.search(r"\{.*\}", text, re.DOTALL)
-        if not m:
-            print("LLM RAW OUTPUT (no JSON found):", text[:1200])
+        parsed = safe_json_from_text(text)
+        if not isinstance(parsed, dict):
             return {"scores": []}
-
-        return json.loads(m.group(0))
+        if "scores" not in parsed:
+            parsed["scores"] = []
+        return parsed
 
     except Exception as e:
         print("OLLAMA ERROR (matrix):", e)
@@ -172,6 +327,41 @@ def validate_matrix(llm_out: dict, options: list[str], criteria: list[str]) -> l
                 out.append({"option": o, "criterion": c, "score": 3, "reason": "Insufficient KB evidence"})
 
     return out
+
+
+def compute_ranking(options, criteria, option_scores):
+    crit_w = {c["name"]: int(c.get("importance") or 3) for c in criteria}
+    by_option = {}
+    for s in option_scores:
+        on = s["option_name"]
+        cn = s["criterion"]
+        sc = int(s["score"])
+        by_option.setdefault(on, {})
+        by_option[on][cn] = sc
+
+    totals = []
+    for opt in options:
+        name = opt["name"]
+        total = 0
+        weight_sum = 0
+
+        for cn, w in crit_w.items():
+            weight_sum += w
+            sc = by_option.get(name, {}).get(cn, 3)
+            total += sc * w
+
+        if weight_sum == 0:
+            weight_sum = 1
+
+        totals.append({
+            "option": name,
+            "weighted_score": total,
+            "weight_sum": weight_sum,
+            "normalized_0_100": round((total / (weight_sum * 5)) * 100, 2)
+        })
+
+    totals.sort(key=lambda x: x["weighted_score"], reverse=True)
+    return totals
 
 
 def get_db():
@@ -219,15 +409,6 @@ def init_db():
     )
     """)
 
-    try:
-        cur.execute("ALTER TABLE decisions ADD COLUMN extracted_context_json TEXT")
-    except sqlite3.OperationalError:
-        pass
-    try:
-        cur.execute("ALTER TABLE decisions ADD COLUMN kb_used_json TEXT")
-    except sqlite3.OperationalError:
-        pass
-
     cur.execute("""
     CREATE TABLE IF NOT EXISTS options (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -249,11 +430,6 @@ def init_db():
         FOREIGN KEY(decision_id) REFERENCES decisions(id)
     )
     """)
-
-    try:
-        cur.execute("ALTER TABLE criteria ADD COLUMN importance INTEGER DEFAULT 3")
-    except sqlite3.OperationalError:
-        pass
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS option_scores (
@@ -352,7 +528,10 @@ def login():
     session["user_id"] = user["id"]
     session["user_name"] = user["name"]
 
-    prof = conn.execute("SELECT 1 FROM profiles WHERE user_id = ?", (user["id"],)).fetchone()
+    prof = conn.execute(
+        "SELECT 1 FROM profiles WHERE user_id = ?",
+        (user["id"],)
+    ).fetchone()
     conn.close()
 
     if prof:
@@ -382,7 +561,10 @@ def dashboard():
 @login_required
 def quiz():
     conn = get_db()
-    existing = conn.execute("SELECT 1 FROM profiles WHERE user_id = ?", (session["user_id"],)).fetchone()
+    existing = conn.execute(
+        "SELECT 1 FROM profiles WHERE user_id = ?",
+        (session["user_id"],)
+    ).fetchone()
     conn.close()
 
     if request.method == "GET":
@@ -440,8 +622,10 @@ def decision_submit():
         return {"ok": False, "error": "Add at least 1 criterion"}, 400
 
     extracted = extract_decision_details(question)
-    decision_type = (extracted.get("decision_type") or "other").strip().lower()
+    decision_type = (extracted.get("decision_type") or guess_decision_type(question)).strip().lower()
+
     print("EXTRACTED RESULT:", extracted)
+    print("DECISION TYPE:", decision_type)
 
     retrieved_docs = retrieve(KB_DOCS, decision_type, question, top_k=3)
     kb_used = [{
@@ -453,7 +637,7 @@ def decision_submit():
 
     print("KB RETRIEVED:", [d.get("path") for d in retrieved_docs])
 
-    scoring_docs = retrieved_docs[:1]
+    scoring_docs = pick_scoring_docs(retrieved_docs, question, max_docs=2)
     print("SCORING DOCS:", [d.get("path") for d in scoring_docs])
 
     conn = get_db()
@@ -507,6 +691,9 @@ def decision_submit():
     llm_out = llm_fill_matrix(question, opt_names, crit_names, scoring_docs)
     matrix = validate_matrix(llm_out, opt_names, crit_names)
 
+    if not matrix:
+        matrix = keyword_fallback_scores(question, opt_names, crit_names)
+
     name_to_id = {_norm(r["name"]): r["id"] for r in options_rows}
 
     for mrow in matrix:
@@ -544,13 +731,17 @@ def decision_debug(decision_id):
         (decision_id, session["user_id"])
     ).fetchone()
 
+    if not row:
+        conn.close()
+        return "Not found", 404
+
     opts = conn.execute(
-        "SELECT id, name FROM options WHERE decision_id = ?",
+        "SELECT id, name FROM options WHERE decision_id = ? ORDER BY id",
         (decision_id,)
     ).fetchall()
 
     crit = conn.execute(
-        "SELECT name, importance FROM criteria WHERE decision_id = ?",
+        "SELECT name, importance FROM criteria WHERE decision_id = ? ORDER BY id",
         (decision_id,)
     ).fetchall()
 
@@ -574,10 +765,13 @@ def decision_debug(decision_id):
 
     conn.close()
 
-    if not row:
-        return "Not found", 404
+    options_list = [{"id": o["id"], "name": o["name"]} for o in opts]
+    criteria_list = [{"name": c["name"], "importance": c["importance"]} for c in crit]
+    score_list = [{"option_name": s["option_name"], "criterion": s["criterion"], "score": s["score"]} for s in scores]
 
-    return {
+    ranking = compute_ranking(options_list, criteria_list, score_list)
+
+    return jsonify({
         "question": row["question"],
         "extracted": json.loads(row["extracted_context_json"] or "{}"),
         "kb_used": json.loads(row["kb_used_json"] or "[]"),
@@ -590,8 +784,9 @@ def decision_debug(decision_id):
         "score_reasons": [
             {"option_id": r["option_id"], "option_name": r["option_name"], "criterion": r["criterion"], "reason": r["reason"]}
             for r in reasons
-        ]
-    }
+        ],
+        "ranking": ranking
+    })
 
 
 if __name__ == "__main__":
