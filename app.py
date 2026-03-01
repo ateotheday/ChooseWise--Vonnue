@@ -22,6 +22,10 @@ print("DB PATH:", DB_PATH)
 
 KB_DOCS = load_kb("knowledgeBaseFiles")
 
+
+#loading the model locally
+
+
 OLLAMA_URL = "http://localhost:11434/api/generate"
 OLLAMA_MODEL = "llama3"
 
@@ -34,7 +38,11 @@ MATRIX_RETRIES = 2
 
 def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", (s or "").strip().lower())
+
+
 #fallback code..if it fails to fetch reason from the KB
+
+
 def fallback_reason(option_name, criterion_name, importance, score, weighted):
     return (
         f"Heuristic fallback: '{criterion_name}' was weighted {importance}/5. "
@@ -128,6 +136,9 @@ def ollama_generate(prompt: str, timeout: int, retries: int = 0):
             last_err = e
             time.sleep(0.8 * (attempt + 1))
     raise last_err
+
+
+#prompt given to the model
 
 
 def extract_decision_details(question: str) -> dict:
@@ -457,6 +468,8 @@ def init_db():
     conn.commit()
     conn.close()
 
+#login route
+
 
 def login_required(fn):
     @wraps(fn)
@@ -547,6 +560,8 @@ def logout():
     session.clear()
     return redirect(url_for("home"))
 
+#dashboard route
+
 
 @app.route("/dashboard")
 @login_required
@@ -558,6 +573,8 @@ def dashboard():
     ).fetchone()
     conn.close()
     return render_template("dashboard.html", name=session.get("user_name"), profile=profile)
+
+#quiz page redirect
 
 
 @app.route("/quiz", methods=["GET", "POST"])
@@ -586,6 +603,8 @@ def quiz():
         return render_template("quiz.html")
 
     conn = get_db()
+#profiles table is created for storing the quiz scores in DB
+    
     conn.execute("""
         INSERT INTO profiles (user_id, risk, budget, long_term, analytical, convenience)
         VALUES (?, ?, ?, ?, ?, ?)
@@ -601,6 +620,7 @@ def quiz():
 
     return redirect(url_for("dashboard"))
 
+#decision page route
 
 @app.route("/decision", methods=["GET"])
 @login_required
@@ -721,7 +741,7 @@ def decision_submit():
     conn.commit()
     conn.close()
 
-    # return also the url so frontend can redirect
+    # return also the URL so the frontend can redirect
     return {"ok": True, "decision_id": decision_id, "kb_used": kb_used, "result_url": f"/decision/{decision_id}/result"}
 
 
@@ -794,6 +814,7 @@ def decision_debug(decision_id):
 
 
 #  NEW RESULT PAGE ROUTE
+
 @app.route("/decision/<int:decision_id>/result", methods=["GET"])
 @login_required
 def decision_result(decision_id):
