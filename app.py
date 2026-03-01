@@ -7,6 +7,10 @@ from functools import wraps
 import requests
 import re
 
+from kb_loader import load_kb
+from retriever import retrieve
+from kb_score_apply import apply_default_scores
+
 app = Flask(__name__)
 app.secret_key = "change_this_to_a_random_secret"
 
@@ -14,10 +18,20 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "app.db")
 
 # ----------------------------
-# OLLAMA (LOCAL LLM EXTRACTION)
+# LOAD KB DOCS
+# ----------------------------
+KB_DOCS = load_kb("knowledgeBaseFiles")
+
+# ----------------------------
+# OLLAMA CONFIG
 # ----------------------------
 OLLAMA_URL = "http://localhost:11434/api/generate"
 OLLAMA_MODEL = "llama3"
+
+
+# ----------------------------
+# LLM EXTRACTION
+# ----------------------------
 def extract_decision_details(question: str) -> dict:
     prompt = f"""You are an information extraction engine.
 Return ONLY valid minified JSON. No explanations. No markdown. No code fences.
@@ -33,6 +47,7 @@ Rules:
 - constraints, preferences, and entities must ALWAYS be arrays (possibly empty).
 
 Text: {question}"""
+
     try:
         r = requests.post(
             OLLAMA_URL,
@@ -42,22 +57,22 @@ Text: {question}"""
         r.raise_for_status()
         text = (r.json().get("response") or "").strip()
 
-        # First try: direct JSON
         try:
             parsed = json.loads(text)
         except Exception:
-            # Fallback: extract first JSON object in the output
             m = re.search(r"\{.*\}", text, re.DOTALL)
             if not m:
                 raise ValueError("No JSON found in model output")
             parsed = json.loads(m.group(0))
 
-        # Safety defaults (never crash)
-        if parsed.get("constraints") is None: parsed["constraints"] = []
-        if parsed.get("preferences") is None: parsed["preferences"] = []
-        if parsed.get("entities") is None: parsed["entities"] = []
+        if parsed.get("constraints") is None:
+            parsed["constraints"] = []
+        if parsed.get("preferences") is None:
+            parsed["preferences"] = []
+        if parsed.get("entities") is None:
+            parsed["entities"] = []
 
-        for k in ["decision_type", "goal", "time_horizon", "risk_level"]:
+        for k in ["decision", "decision_type", "goal", "time_horizon", "risk_level"]:
             if k not in parsed:
                 parsed[k] = None
 
@@ -66,6 +81,7 @@ Text: {question}"""
     except Exception as e:
         print("OLLAMA ERROR:", e)
         return {
+            "decision": None,
             "decision_type": None,
             "goal": None,
             "constraints": [],
@@ -112,20 +128,26 @@ def init_db():
     )
     """)
 
+    # Create decisions with kb_used_json included
     cur.execute("""
     CREATE TABLE IF NOT EXISTS decisions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
         question TEXT NOT NULL,
         extracted_context_json TEXT,
+        kb_used_json TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(user_id) REFERENCES users(id)
     )
     """)
 
-    # migration for older DBs
+    # Migration safety for older DBs
     try:
         cur.execute("ALTER TABLE decisions ADD COLUMN extracted_context_json TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        cur.execute("ALTER TABLE decisions ADD COLUMN kb_used_json TEXT")
     except sqlite3.OperationalError:
         pass
 
@@ -145,10 +167,16 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         decision_id INTEGER NOT NULL,
         name TEXT NOT NULL,
+        importance INTEGER DEFAULT 3,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(decision_id) REFERENCES decisions(id)
     )
     """)
+
+    try:
+        cur.execute("ALTER TABLE criteria ADD COLUMN importance INTEGER DEFAULT 3")
+    except sqlite3.OperationalError:
+        pass
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS option_scores (
@@ -275,7 +303,6 @@ def dashboard():
         (session["user_id"],)
     ).fetchone()
     conn.close()
-
     return render_template("dashboard.html", name=session.get("user_name"), profile=profile)
 
 
@@ -331,7 +358,7 @@ def decision():
 
 
 # ----------------------------
-# API: SAVE DECISION (called by decision.js)
+# API: SAVE DECISION + RAG + DEFAULT KB SCORING
 # ----------------------------
 @app.route("/decision/submit", methods=["POST"])
 @login_required
@@ -340,7 +367,7 @@ def decision_submit():
 
     question = (data.get("question") or "").strip()
     options_list = data.get("options") or []
-    criteria_list = data.get("criteria") or []
+    criteria_list = data.get("criteria") or []  # list of {name, importance}
 
     if not question:
         return {"ok": False, "error": "Missing question"}, 400
@@ -352,44 +379,130 @@ def decision_submit():
     extracted = extract_decision_details(question)
     print("EXTRACTED RESULT:", extracted)
 
+    decision_type = (extracted.get("decision_type") or "other").strip().lower()
+
+    retrieved_docs = retrieve(KB_DOCS, decision_type, question, top_k=2)
+    kb_used = [{
+        "path": d["path"],
+        "title": d.get("title", ""),
+        "category": d.get("category", "")
+    } for d in retrieved_docs]
+    kb_used_json = json.dumps(kb_used, ensure_ascii=False)
+
+    print("KB RETRIEVED:", [d.get("path") for d in retrieved_docs])
+    print("KB SCORING MODES:", [d.get("scoring_mode") for d in retrieved_docs])
+
     extracted_json = json.dumps(extracted, ensure_ascii=False)
 
     conn = get_db()
     cur = conn.cursor()
 
     cur.execute(
-        "INSERT INTO decisions (user_id, question, extracted_context_json) VALUES (?, ?, ?)",
-        (session["user_id"], question, extracted_json)
+        "INSERT INTO decisions (user_id, question, extracted_context_json, kb_used_json) VALUES (?, ?, ?, ?)",
+        (session["user_id"], question, extracted_json, kb_used_json)
     )
     decision_id = cur.lastrowid
 
+    # save options
     for opt in options_list:
+        name = (str(opt) or "").strip()
+        if not name:
+            continue
         cur.execute(
             "INSERT INTO options (decision_id, name, source) VALUES (?, ?, ?)",
-            (decision_id, opt, "manual")
+            (decision_id, name, "manual")
         )
 
+    # save criteria
     for c in criteria_list:
+        if isinstance(c, dict):
+            name = (c.get("name") or "").strip()
+            importance = int(c.get("importance") or 3)
+        else:
+            name = (str(c) or "").strip()
+            importance = 3
+
+        if not name:
+            continue
+        importance = max(1, min(5, importance))
+
         cur.execute(
-            "INSERT INTO criteria (decision_id, name) VALUES (?, ?)",
-            (decision_id, c)
+            "INSERT INTO criteria (decision_id, name, importance) VALUES (?, ?, ?)",
+            (decision_id, name, importance)
+        )
+
+    # ----------------------------
+    # APPLY DEFAULT KB SCORING (fills option_scores)
+    # ----------------------------
+    options_rows = conn.execute(
+        "SELECT id, name FROM options WHERE decision_id = ?",
+        (decision_id,)
+    ).fetchall()
+
+    criteria_rows = conn.execute(
+        "SELECT name, importance FROM criteria WHERE decision_id = ?",
+        (decision_id,)
+    ).fetchall()
+
+    suggestions = []
+    for d in retrieved_docs:
+        if (d.get("scoring_mode") or "").strip().lower() == "default_role_based":
+            suggestions = apply_default_scores(
+                d,
+                options=[{"id": r["id"], "name": r["name"]} for r in options_rows],
+                criteria=[{"name": r["name"], "importance": r["importance"]} for r in criteria_rows],
+            )
+            if suggestions:
+                break
+
+    print("KB SCORE SUGGESTIONS:", suggestions)
+
+    for s in suggestions:
+        cur.execute(
+            """INSERT INTO option_scores (option_id, criterion, score)
+               VALUES (?, ?, ?)
+               ON CONFLICT(option_id, criterion) DO UPDATE SET score=excluded.score""",
+            (s["option_id"], s["criterion"], s["score"])
         )
 
     conn.commit()
     conn.close()
 
-    return {"ok": True, "decision_id": decision_id}
+    return {"ok": True, "decision_id": decision_id, "kb_used": kb_used}
 
 
-# OPTIONAL: quick debug endpoint to see extracted JSON
+# ----------------------------
+# DEBUG ENDPOINT
+# ----------------------------
 @app.route("/decision/<int:decision_id>/debug", methods=["GET"])
 @login_required
 def decision_debug(decision_id):
     conn = get_db()
+
     row = conn.execute(
-        "SELECT question, extracted_context_json FROM decisions WHERE id = ? AND user_id = ?",
+        "SELECT question, extracted_context_json, kb_used_json FROM decisions WHERE id = ? AND user_id = ?",
         (decision_id, session["user_id"])
     ).fetchone()
+
+    opts = conn.execute(
+        "SELECT id, name FROM options WHERE decision_id = ?",
+        (decision_id,)
+    ).fetchall()
+
+    crit = conn.execute(
+        "SELECT name, importance FROM criteria WHERE decision_id = ?",
+        (decision_id,)
+    ).fetchall()
+
+    scores = conn.execute(
+        """SELECT os.option_id, o.name as option_name, os.criterion, os.score
+           FROM option_scores os
+           JOIN options o ON o.id = os.option_id
+           WHERE o.decision_id = ?
+           ORDER BY o.id, os.criterion""",
+        (decision_id,)
+    ).fetchall()
+
     conn.close()
 
     if not row:
@@ -397,7 +510,14 @@ def decision_debug(decision_id):
 
     return {
         "question": row["question"],
-        "extracted": json.loads(row["extracted_context_json"] or "{}")
+        "extracted": json.loads(row["extracted_context_json"] or "{}"),
+        "kb_used": json.loads(row["kb_used_json"] or "[]"),
+        "options": [o["name"] for o in opts],
+        "criteria": [{"name": c["name"], "importance": c["importance"]} for c in crit],
+        "option_scores": [
+            {"option_id": s["option_id"], "option_name": s["option_name"], "criterion": s["criterion"], "score": s["score"]}
+            for s in scores
+        ]
     }
 
 

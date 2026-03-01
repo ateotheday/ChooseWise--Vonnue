@@ -1,7 +1,7 @@
 const $ = (id) => document.getElementById(id);
 
 let options = [];
-let criteria = [];
+let criteria = []; // now stores: [{ name: string, importance: number }]
 let optionsSubmitted = false;
 let criteriaSubmitted = false;
 
@@ -40,31 +40,40 @@ function renderPills(){
     </div>
   `).join("");
 
-  $("criteriaPills").innerHTML = criteria.map((t, idx) => `
+  $("criteriaPills").innerHTML = criteria.map((c, idx) => `
     <div class="pill">
-      ${escapeHtml(t)}
+      ${escapeHtml(c.name)} <span style="opacity:.75;">(${c.importance}/5)</span>
       <span class="x" data-type="criteria" data-idx="${idx}">×</span>
     </div>
   `).join("");
 }
 
-function addManualItem(mode, value){
-  const v = (value || "").trim();
-  if(!v) return;
-
+function addManualItem(mode){
   if(mode === "option"){
+    const v = ($("optionManualInput").value || "").trim();
+    if(!v) return;
+
     options.push(v);
     $("optionManualInput").value = "";
     $("optionManualInputWrap").style.display = "none";
     optionsSubmitted = false;
     $("optionsStatus").textContent = "Options updated (not submitted yet).";
-  } else {
-    criteria.push(v);
-    $("criteriaManualInput").value = "";
-    $("criteriaManualInputWrap").style.display = "none";
-    criteriaSubmitted = false;
-    $("criteriaStatus").textContent = "Criteria updated (not submitted yet).";
+    renderPills();
+    return;
   }
+
+  const name = ($("criteriaManualInput").value || "").trim();
+  if(!name) return;
+
+  const importance = Number(($("criteriaImportance")?.value) || 3);
+
+  criteria.push({ name, importance });
+
+  $("criteriaManualInput").value = "";
+  if ($("criteriaImportance")) $("criteriaImportance").value = "3";
+  $("criteriaManualInputWrap").style.display = "none";
+  criteriaSubmitted = false;
+  $("criteriaStatus").textContent = "Criteria updated (not submitted yet).";
   renderPills();
 }
 
@@ -75,7 +84,11 @@ function addSystemSuggestions(mode){
     optionsSubmitted = false;
     $("optionsStatus").textContent = "System suggested options added (prototype).";
   } else {
-    const samples = ["Cost", "Performance", "Convenience"];
+    const samples = [
+      { name: "Cost", importance: 4 },
+      { name: "Performance", importance: 4 },
+      { name: "Convenience", importance: 3 }
+    ];
     samples.forEach(s => criteria.push(s));
     criteriaSubmitted = false;
     $("criteriaStatus").textContent = "System suggested criteria added (prototype).";
@@ -141,20 +154,20 @@ document.addEventListener("DOMContentLoaded", () => {
     if(e.target === $("modalBackdrop")) closeModal();
   });
 
-  $("optionAddConfirmBtn").addEventListener("click", () => addManualItem("option", $("optionManualInput").value));
-  $("criteriaAddConfirmBtn").addEventListener("click", () => addManualItem("criteria", $("criteriaManualInput").value));
+  $("optionAddConfirmBtn").addEventListener("click", () => addManualItem("option"));
+  $("criteriaAddConfirmBtn").addEventListener("click", () => addManualItem("criteria"));
 
   $("optionManualInput").addEventListener("keydown", (e) => {
     if(e.key === "Enter"){
       e.preventDefault();
-      addManualItem("option", $("optionManualInput").value);
+      addManualItem("option");
     }
   });
 
   $("criteriaManualInput").addEventListener("keydown", (e) => {
     if(e.key === "Enter"){
       e.preventDefault();
-      addManualItem("criteria", $("criteriaManualInput").value);
+      addManualItem("criteria");
     }
   });
 
@@ -176,7 +189,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  //  MUST BE 2 OPTIONS (match backend)
   $("submitOptionsBtn").addEventListener("click", () => {
     if(options.length < 2){
       showToast("Add at least 2 options");
@@ -197,7 +209,6 @@ document.addEventListener("DOMContentLoaded", () => {
     showToast("Criteria submitted ");
   });
 
-  //  Final submit (SAVES TO BACKEND)
   $("finalSubmitBtn").addEventListener("click", async () => {
     if ($("decisionLockedWrap").style.display === "none") {
       showToast("Lock the decision first");
@@ -242,10 +253,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       showToast("Saved ");
-      $("finalHint").textContent = `Saved  Decision ID: ${out.decision_id}`;
-
-      // Optional: open debug endpoint
-      // window.location.href = `/decision/${out.decision_id}/debug`;
+      $("finalHint").textContent = `Saved ✅ Decision ID: ${out.decision_id}`;
 
     } catch (err) {
       showToast("Error while saving");

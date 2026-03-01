@@ -83,14 +83,27 @@
 
       <div id="criteriaManualInputWrap" style="display:none;">
         <label for="criteriaManualInput">Add criterion manually</label>
+
         <div class="row">
           <div class="col">
             <input class="small" id="criteriaManualInput" placeholder="Criterion name (short) e.g., Battery life" />
           </div>
+
+          <div>
+            <select class="small" id="criteriaImportance">
+              <option value="1">Importance 1/5</option>
+              <option value="2">Importance 2/5</option>
+              <option value="3" selected>Importance 3/5</option>
+              <option value="4">Importance 4/5</option>
+              <option value="5">Importance 5/5</option>
+            </select>
+          </div>
+
           <div>
             <button class="btn" id="criteriaAddConfirmBtn"><span class="icon">＋</span> Add</button>
           </div>
         </div>
+
         <div class="hint"></div>
       </div>
 
