@@ -9,7 +9,6 @@ import re
 
 from kb_loader import load_kb
 from retriever import retrieve
-from kb_score_apply import apply_default_scores
 
 app = Flask(__name__)
 app.secret_key = "change_this_to_a_random_secret"
@@ -17,21 +16,19 @@ app.secret_key = "change_this_to_a_random_secret"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "app.db")
 
-# ----------------------------
-# LOAD KB DOCS
-# ----------------------------
+print("RUNNING THIS FILE:", __file__)
+print("DB PATH:", DB_PATH)
+
 KB_DOCS = load_kb("knowledgeBaseFiles")
 
-# ----------------------------
-# OLLAMA CONFIG
-# ----------------------------
 OLLAMA_URL = "http://localhost:11434/api/generate"
 OLLAMA_MODEL = "llama3"
 
 
-# ----------------------------
-# LLM EXTRACTION
-# ----------------------------
+def _norm(s):
+    return re.sub(r"\s+", " ", (s or "").strip().lower())
+
+
 def extract_decision_details(question: str) -> dict:
     prompt = f"""You are an information extraction engine.
 Return ONLY valid minified JSON. No explanations. No markdown. No code fences.
@@ -79,7 +76,7 @@ Text: {question}"""
         return parsed
 
     except Exception as e:
-        print("OLLAMA ERROR:", e)
+        print("OLLAMA ERROR (extract):", e)
         return {
             "decision": None,
             "decision_type": None,
@@ -92,9 +89,91 @@ Text: {question}"""
         }
 
 
-# ----------------------------
-# DATABASE HELPERS
-# ----------------------------
+def llm_fill_matrix(question: str, options: list[str], criteria: list[str], kb_docs: list[dict]) -> dict:
+    kb_context = "\n\n---\n\n".join(
+        [f"[{d.get('category','')}] {d.get('title','')}\n{(d.get('text') or '')[:900]}" for d in kb_docs]
+    )
+
+    prompt = f"""
+You are a scoring assistant for a transparent decision-support system.
+
+Use ONLY the provided KB context. Do NOT use external knowledge.
+Return ONLY valid minified JSON. No markdown.
+
+IMPORTANT RULES:
+- Use option names EXACTLY as they appear in the Options array (character-for-character).
+- Use criterion names EXACTLY as they appear in the Criteria array (character-for-character).
+- Output MUST include every pair (option, criterion). That means len(Options) * len(Criteria) items.
+
+Score scale: 1 (worst) to 5 (best).
+If KB does not provide enough evidence, return score 3 and reason "Insufficient KB evidence".
+
+Schema:
+{{"scores":[{{"option":string,"criterion":string,"score":int,"reason":string}}]}}
+
+Question: {question}
+Options: {options}
+Criteria: {criteria}
+
+KB context:
+{kb_context}
+""".strip()
+
+    try:
+        r = requests.post(
+            OLLAMA_URL,
+            json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False},
+            timeout=180
+        )
+        r.raise_for_status()
+        text = (r.json().get("response") or "").strip()
+
+        print("KB CONTEXT LEN:", len(kb_context))
+        print("LLM RAW OUTPUT (first 1200):", text[:1200])
+
+        m = re.search(r"\{.*\}", text, re.DOTALL)
+        if not m:
+            print("LLM RAW OUTPUT (no JSON found):", text[:1200])
+            return {"scores": []}
+
+        return json.loads(m.group(0))
+
+    except Exception as e:
+        print("OLLAMA ERROR (matrix):", e)
+        return {"scores": []}
+
+
+def validate_matrix(llm_out: dict, options: list[str], criteria: list[str]) -> list[dict]:
+    wanted = {(_norm(o), _norm(c)) for o in options for c in criteria}
+    out = []
+
+    for item in (llm_out.get("scores") or []):
+        opt = (item.get("option") or "").strip()
+        crit = (item.get("criterion") or "").strip()
+        score = item.get("score")
+        reason = (item.get("reason") or "").strip()
+
+        key = (_norm(opt), _norm(crit))
+        if key not in wanted:
+            continue
+
+        if not isinstance(score, int) or score < 1 or score > 5:
+            score = 3
+        if not reason:
+            reason = "Insufficient KB evidence"
+
+        out.append({"option": opt, "criterion": crit, "score": score, "reason": reason})
+
+    present = {(_norm(x["option"]), _norm(x["criterion"])) for x in out}
+
+    for o in options:
+        for c in criteria:
+            if (_norm(o), _norm(c)) not in present:
+                out.append({"option": o, "criterion": c, "score": 3, "reason": "Insufficient KB evidence"})
+
+    return out
+
+
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -128,7 +207,6 @@ def init_db():
     )
     """)
 
-    # Create decisions with kb_used_json included
     cur.execute("""
     CREATE TABLE IF NOT EXISTS decisions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -141,7 +219,6 @@ def init_db():
     )
     """)
 
-    # Migration safety for older DBs
     try:
         cur.execute("ALTER TABLE decisions ADD COLUMN extracted_context_json TEXT")
     except sqlite3.OperationalError:
@@ -188,13 +265,20 @@ def init_db():
     )
     """)
 
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS option_score_reasons (
+        option_id INTEGER NOT NULL,
+        criterion TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        PRIMARY KEY(option_id, criterion),
+        FOREIGN KEY(option_id) REFERENCES options(id)
+    )
+    """)
+
     conn.commit()
     conn.close()
 
 
-# ----------------------------
-# AUTH DECORATOR
-# ----------------------------
 def login_required(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
@@ -204,17 +288,11 @@ def login_required(fn):
     return wrapper
 
 
-# ----------------------------
-# ROUTES: PUBLIC
-# ----------------------------
 @app.route("/")
 def home():
     return render_template("index.html")
 
 
-# ----------------------------
-# ROUTES: AUTH
-# ----------------------------
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "GET":
@@ -274,10 +352,7 @@ def login():
     session["user_id"] = user["id"]
     session["user_name"] = user["name"]
 
-    prof = conn.execute(
-        "SELECT 1 FROM profiles WHERE user_id = ?",
-        (user["id"],)
-    ).fetchone()
+    prof = conn.execute("SELECT 1 FROM profiles WHERE user_id = ?", (user["id"],)).fetchone()
     conn.close()
 
     if prof:
@@ -291,9 +366,6 @@ def logout():
     return redirect(url_for("home"))
 
 
-# ----------------------------
-# ROUTES: PROTECTED
-# ----------------------------
 @app.route("/dashboard")
 @login_required
 def dashboard():
@@ -310,10 +382,7 @@ def dashboard():
 @login_required
 def quiz():
     conn = get_db()
-    existing = conn.execute(
-        "SELECT 1 FROM profiles WHERE user_id = ?",
-        (session["user_id"],)
-    ).fetchone()
+    existing = conn.execute("SELECT 1 FROM profiles WHERE user_id = ?", (session["user_id"],)).fetchone()
     conn.close()
 
     if request.method == "GET":
@@ -348,18 +417,12 @@ def quiz():
     return redirect(url_for("dashboard"))
 
 
-# ----------------------------
-# ROUTES: DECISION UI
-# ----------------------------
 @app.route("/decision", methods=["GET"])
 @login_required
 def decision():
     return render_template("decision.html")
 
 
-# ----------------------------
-# API: SAVE DECISION + RAG + DEFAULT KB SCORING
-# ----------------------------
 @app.route("/decision/submit", methods=["POST"])
 @login_required
 def decision_submit():
@@ -367,7 +430,7 @@ def decision_submit():
 
     question = (data.get("question") or "").strip()
     options_list = data.get("options") or []
-    criteria_list = data.get("criteria") or []  # list of {name, importance}
+    criteria_list = data.get("criteria") or []
 
     if not question:
         return {"ok": False, "error": "Missing question"}, 400
@@ -377,33 +440,31 @@ def decision_submit():
         return {"ok": False, "error": "Add at least 1 criterion"}, 400
 
     extracted = extract_decision_details(question)
+    decision_type = (extracted.get("decision_type") or "other").strip().lower()
     print("EXTRACTED RESULT:", extracted)
 
-    decision_type = (extracted.get("decision_type") or "other").strip().lower()
-
-    retrieved_docs = retrieve(KB_DOCS, decision_type, question, top_k=2)
+    retrieved_docs = retrieve(KB_DOCS, decision_type, question, top_k=3)
     kb_used = [{
-        "path": d["path"],
+        "path": d.get("path", ""),
         "title": d.get("title", ""),
         "category": d.get("category", "")
     } for d in retrieved_docs]
     kb_used_json = json.dumps(kb_used, ensure_ascii=False)
 
     print("KB RETRIEVED:", [d.get("path") for d in retrieved_docs])
-    print("KB SCORING MODES:", [d.get("scoring_mode") for d in retrieved_docs])
 
-    extracted_json = json.dumps(extracted, ensure_ascii=False)
+    scoring_docs = retrieved_docs[:1]
+    print("SCORING DOCS:", [d.get("path") for d in scoring_docs])
 
     conn = get_db()
     cur = conn.cursor()
 
     cur.execute(
         "INSERT INTO decisions (user_id, question, extracted_context_json, kb_used_json) VALUES (?, ?, ?, ?)",
-        (session["user_id"], question, extracted_json, kb_used_json)
+        (session["user_id"], question, json.dumps(extracted, ensure_ascii=False), kb_used_json)
     )
     decision_id = cur.lastrowid
 
-    # save options
     for opt in options_list:
         name = (str(opt) or "").strip()
         if not name:
@@ -413,7 +474,6 @@ def decision_submit():
             (decision_id, name, "manual")
         )
 
-    # save criteria
     for c in criteria_list:
         if isinstance(c, dict):
             name = (c.get("name") or "").strip()
@@ -431,9 +491,6 @@ def decision_submit():
             (decision_id, name, importance)
         )
 
-    # ----------------------------
-    # APPLY DEFAULT KB SCORING (fills option_scores)
-    # ----------------------------
     options_rows = conn.execute(
         "SELECT id, name FROM options WHERE decision_id = ?",
         (decision_id,)
@@ -444,25 +501,31 @@ def decision_submit():
         (decision_id,)
     ).fetchall()
 
-    suggestions = []
-    for d in retrieved_docs:
-        if (d.get("scoring_mode") or "").strip().lower() == "default_role_based":
-            suggestions = apply_default_scores(
-                d,
-                options=[{"id": r["id"], "name": r["name"]} for r in options_rows],
-                criteria=[{"name": r["name"], "importance": r["importance"]} for r in criteria_rows],
-            )
-            if suggestions:
-                break
+    opt_names = [r["name"] for r in options_rows]
+    crit_names = [r["name"] for r in criteria_rows]
 
-    print("KB SCORE SUGGESTIONS:", suggestions)
+    llm_out = llm_fill_matrix(question, opt_names, crit_names, scoring_docs)
+    matrix = validate_matrix(llm_out, opt_names, crit_names)
 
-    for s in suggestions:
+    name_to_id = {_norm(r["name"]): r["id"] for r in options_rows}
+
+    for mrow in matrix:
+        oid = name_to_id.get(_norm(mrow["option"]))
+        if not oid:
+            continue
+
         cur.execute(
             """INSERT INTO option_scores (option_id, criterion, score)
                VALUES (?, ?, ?)
                ON CONFLICT(option_id, criterion) DO UPDATE SET score=excluded.score""",
-            (s["option_id"], s["criterion"], s["score"])
+            (oid, mrow["criterion"], mrow["score"])
+        )
+
+        cur.execute(
+            """INSERT INTO option_score_reasons (option_id, criterion, reason)
+               VALUES (?, ?, ?)
+               ON CONFLICT(option_id, criterion) DO UPDATE SET reason=excluded.reason""",
+            (oid, mrow["criterion"], mrow["reason"])
         )
 
     conn.commit()
@@ -471,9 +534,6 @@ def decision_submit():
     return {"ok": True, "decision_id": decision_id, "kb_used": kb_used}
 
 
-# ----------------------------
-# DEBUG ENDPOINT
-# ----------------------------
 @app.route("/decision/<int:decision_id>/debug", methods=["GET"])
 @login_required
 def decision_debug(decision_id):
@@ -503,6 +563,15 @@ def decision_debug(decision_id):
         (decision_id,)
     ).fetchall()
 
+    reasons = conn.execute(
+        """SELECT r.option_id, o.name as option_name, r.criterion, r.reason
+           FROM option_score_reasons r
+           JOIN options o ON o.id = r.option_id
+           WHERE o.decision_id = ?
+           ORDER BY o.id, r.criterion""",
+        (decision_id,)
+    ).fetchall()
+
     conn.close()
 
     if not row:
@@ -517,11 +586,14 @@ def decision_debug(decision_id):
         "option_scores": [
             {"option_id": s["option_id"], "option_name": s["option_name"], "criterion": s["criterion"], "score": s["score"]}
             for s in scores
+        ],
+        "score_reasons": [
+            {"option_id": r["option_id"], "option_name": r["option_name"], "criterion": r["criterion"], "reason": r["reason"]}
+            for r in reasons
         ]
     }
 
 
 if __name__ == "__main__":
     init_db()
-    print("DB PATH:", DB_PATH)
     app.run(debug=True)

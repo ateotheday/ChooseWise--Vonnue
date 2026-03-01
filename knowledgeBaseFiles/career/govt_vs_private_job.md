@@ -4,18 +4,6 @@ Decision Type: career
 Category: govt_vs_private
 Title: Government Job vs Private Sector Career
 
-Scoring Mode:
-default_role_based
-# Explanation:
-# This category supports default scoring rules.
-# Option roles must map to:
-# - govt
-# - private
-
-Option Roles:
-- govt
-- private
-
 Purpose:
 Support structured comparison between public sector and private sector roles.
 
@@ -26,57 +14,19 @@ Broad Considerations:
 - Pension benefits vs High compensation potential
 
 Criteria Templates:
-- job_security
-- salary_growth_potential
-- pension_benefits
-- work_pressure
-- work_life_balance
-- transfer_frequency
-- promotion_transparency
-- social_prestige
-- skill_modernization
-- innovation_exposure
-- job_autonomy
-- income_ceiling
-- economic_downturn_risk
-
-Criterion Types:
-# Format:
-# criterion_key | type
-# benefit = higher is better
-# cost = lower is better
-
-job_security | benefit
-salary_growth_potential | benefit
-pension_benefits | benefit
-work_pressure | cost
-work_life_balance | benefit
-transfer_frequency | cost
-promotion_transparency | benefit
-social_prestige | benefit
-skill_modernization | benefit
-innovation_exposure | benefit
-job_autonomy | benefit
-income_ceiling | benefit
-economic_downturn_risk | cost
-
-## Default Scoring Rules (1–5)
-# Format:
-# criterion_key | govt | private
-
-job_security | 5 | 2
-salary_growth_potential | 2 | 5
-pension_benefits | 5 | 2
-work_pressure | 4 | 2
-work_life_balance | 4 | 2
-transfer_frequency | 2 | 4
-promotion_transparency | 3 | 4
-social_prestige | 4 | 3
-skill_modernization | 2 | 5
-innovation_exposure | 2 | 5
-job_autonomy | 3 | 4
-income_ceiling | 2 | 5
-economic_downturn_risk | 5 | 2
+- job security
+- salary growth potential
+- pension / retirement benefits
+- work pressure
+- work-life balance
+- transfer frequency
+- promotion transparency
+- social prestige
+- skill modernization
+- innovation exposure
+- job autonomy
+- income ceiling
+- risk exposure during economic downturn
 
 Tradeoffs:
 - Government jobs offer strong stability but slower financial growth.
