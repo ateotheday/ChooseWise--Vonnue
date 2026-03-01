@@ -226,7 +226,6 @@ def keyword_fallback_scores(question: str, options: list[str], criteria: list[st
 
             score = 3
             reason = "Insufficient KB evidence"
-
             found = False
 
             if c_l in criterion_keywords:
@@ -718,7 +717,8 @@ def decision_submit():
     conn.commit()
     conn.close()
 
-    return {"ok": True, "decision_id": decision_id, "kb_used": kb_used}
+    # return also the url so frontend can redirect
+    return {"ok": True, "decision_id": decision_id, "kb_used": kb_used, "result_url": f"/decision/{decision_id}/result"}
 
 
 @app.route("/decision/<int:decision_id>/debug", methods=["GET"])
@@ -787,6 +787,104 @@ def decision_debug(decision_id):
         ],
         "ranking": ranking
     })
+
+
+# ✅✅✅ NEW RESULT PAGE ROUTE
+@app.route("/decision/<int:decision_id>/result", methods=["GET"])
+@login_required
+def decision_result(decision_id):
+    conn = get_db()
+
+    d = conn.execute(
+        "SELECT id, question, created_at, kb_used_json FROM decisions WHERE id=? AND user_id=?",
+        (decision_id, session["user_id"])
+    ).fetchone()
+
+    if not d:
+        conn.close()
+        return "Not found", 404
+
+    opts = conn.execute(
+        "SELECT id, name FROM options WHERE decision_id=? ORDER BY id",
+        (decision_id,)
+    ).fetchall()
+
+    crit = conn.execute(
+        "SELECT name, importance FROM criteria WHERE decision_id=? ORDER BY id",
+        (decision_id,)
+    ).fetchall()
+
+    scores = conn.execute(
+        """SELECT os.option_id, o.name as option_name, os.criterion, os.score
+           FROM option_scores os
+           JOIN options o ON o.id = os.option_id
+           WHERE o.decision_id = ?
+           ORDER BY o.id, os.criterion""",
+        (decision_id,)
+    ).fetchall()
+
+    reasons = conn.execute(
+        """SELECT r.option_id, o.name as option_name, r.criterion, r.reason
+           FROM option_score_reasons r
+           JOIN options o ON o.id = r.option_id
+           WHERE o.decision_id = ?
+           ORDER BY o.id, r.criterion""",
+        (decision_id,)
+    ).fetchall()
+
+    conn.close()
+
+    options_list = [{"id": o["id"], "name": o["name"]} for o in opts]
+    criteria_list = [{"name": c["name"], "importance": c["importance"]} for c in crit]
+    score_list = [{"option_name": s["option_name"], "criterion": s["criterion"], "score": s["score"]} for s in scores]
+    ranking = compute_ranking(options_list, criteria_list, score_list)
+
+    score_map = {}
+    for s in scores:
+        score_map[(_norm(s["option_name"]), _norm(s["criterion"]))] = int(s["score"])
+
+    reason_map = {}
+    for r in reasons:
+        reason_map[(_norm(r["option_name"]), _norm(r["criterion"]))] = r["reason"]
+
+    ranked = []
+    for r in ranking:
+        on = r["option"]
+        breakdown = []
+        for c in criteria_list:
+            cn = c["name"]
+            w = int(c.get("importance") or 3)
+            sc = score_map.get((_norm(on), _norm(cn)), 3)
+            rs = reason_map.get((_norm(on), _norm(cn)), "Insufficient KB evidence")
+            breakdown.append({
+                "criteria": cn,
+                "importance": w,
+                "score": sc,
+                "weighted": sc * w,
+                "reason": rs
+            })
+
+        ranked.append({
+            "name": on,
+            "normalized_0_100": r["normalized_0_100"],
+            "weighted_score": r["weighted_score"],
+            "breakdown": breakdown
+        })
+
+    kb_used = []
+    try:
+        kb_used = json.loads(d["kb_used_json"] or "[]")
+    except:
+        kb_used = []
+
+    decision = {
+        "id": d["id"],
+        "question": d["question"],
+        "created_at": d["created_at"],
+        "kb_used": kb_used
+    }
+
+    return render_template("result.html", decision=decision, ranked=ranked)
 
 
 if __name__ == "__main__":

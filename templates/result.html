@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Result</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<div class="wrap">
+  <div class="title">
+    <h1>Decision Result</h1>
+    <div class="tag">Ranked recommendation</div>
+  </div>
+
+  <div class="card">
+    <div class="sectionHead">
+      <h2>Decision</h2>
+      <div class="row">
+        <a class="btn ghost" href="{{ url_for('dashboard') }}">← Back</a>
+      </div>
+    </div>
+
+    <div class="muted">{{ decision['question'] }}</div>
+    {% if decision.get('created_at') %}
+      <div class="muted small">Created: {{ decision['created_at'] }}</div>
+    {% endif %}
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="sectionHead">
+        <h2>Top Recommendation 🏆</h2>
+      </div>
+
+      {% if ranked and ranked|length > 0 %}
+        <div class="winner">
+          <div class="winnerName">{{ ranked[0]['name'] }}</div>
+          <div class="winnerScore">
+            Score: <b>{{ "%.2f"|format(ranked[0]['normalized_0_100']) }}</b> / 100
+          </div>
+          <div class="muted small">Weighted sum: {{ ranked[0]['weighted_score'] }}</div>
+        </div>
+      {% else %}
+        <div class="muted">No results yet.</div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="sectionHead">
+        <h2>All Options</h2>
+        <div class="row">
+          <button class="btn" id="toggleBreakdownBtn">Toggle breakdown</button>
+        </div>
+      </div>
+
+      {% if ranked and ranked|length > 0 %}
+        <div class="list">
+          {% for opt in ranked %}
+            <div class="listItem">
+              <div class="listLeft">
+                <div class="listTitle">
+                  <span class="rank">#{{ loop.index }}</span>
+                  {{ opt['name'] }}
+                  {% if loop.index == 1 %}<span class="pill win">Recommended</span>{% endif %}
+                </div>
+                <div class="muted small">Weighted sum: {{ opt['weighted_score'] }}</div>
+              </div>
+
+              <div class="listRight">
+                <div class="score">{{ "%.2f"|format(opt['normalized_0_100']) }}</div>
+                <div class="muted small">/100</div>
+              </div>
+            </div>
+
+            <div class="breakdown hidden" data-breakdown>
+              {% if opt.get('breakdown') %}
+                <table class="tbl">
+                  <thead>
+                    <tr>
+                      <th>Criteria</th>
+                      <th>Importance</th>
+                      <th>Score</th>
+                      <th>Weighted</th>
+                      <th>Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in opt['breakdown'] %}
+                      <tr>
+                        <td>{{ row['criteria'] }}</td>
+                        <td>{{ row['importance'] }}</td>
+                        <td>{{ row['score'] }}</td>
+                        <td><b>{{ row['weighted'] }}</b></td>
+                        <td class="muted small">{{ row['reason'] }}</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              {% else %}
+                <div class="muted small">No breakdown stored.</div>
+              {% endif %}
+            </div>
+
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="muted">No options scored yet.</div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const btn = document.getElementById("toggleBreakdownBtn");
+  btn?.addEventListener("click", () => {
+    document.querySelectorAll("[data-breakdown]").forEach(el => el.classList.toggle("hidden"));
+  });
+</script>
+
+</body>
+</html>
