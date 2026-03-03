@@ -406,7 +406,7 @@ http://127.0.0.1:5000
 **7. What I would improve with time**
 
 //the current system might fall short to make correct decisions,
-this can be made better by iproving the Knowledge base and also by using a model using API rather than urnning i tlocally.
+this can be made better by iproving the Knowledge base and also by using a model using API rather than running it locally.
 
 
 If given additional time, I would:
