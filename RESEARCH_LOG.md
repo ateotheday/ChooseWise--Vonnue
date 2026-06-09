@@ -1,5 +1,5 @@
 day #1
-Topic: UI design
+*Topic: UI design*
 
 
 prompt: "Could you design the pages in a cloud theme. I also wanted a scroll effect. When the user scrolls, I want the parts below to be displayed one by one as if they are appearing slowly."
