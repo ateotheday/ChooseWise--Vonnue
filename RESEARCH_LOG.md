@@ -1,5 +1,5 @@
-day #1
-*Topic: UI design*
+###day #1
+**Topic: UI design**
 
 
 prompt: "Could you design the pages in a cloud theme. I also wanted a scroll effect. When the user scrolls, I want the parts below to be displayed one by one as if they are appearing slowly."
@@ -17,7 +17,7 @@ Outcome: from [Stackoverflow] Identified trade-offs in setup complexity and scal
 
 Impact on Development: Opt for SQLite for its portability and simplified deployment.
 
-day #2
+###day #2
 
 prompts :
 [ChatGPT]
@@ -77,12 +77,9 @@ Also, give contents to include in the knowledge base.
 
 
 
---I used ChatGPT  during development for debugging, code generation, and prompt refinement. A
+--I used ChatGPT  during development for debugging, code generation, and prompt refinement. 
 
-Core design decisions and structural changes were made through iterative experimentation and reasoning.
-
-
-
+Core design decisions and structural changes were made by me.
 
 
 
