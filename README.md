@@ -12,6 +12,10 @@ https://github.com/user-attachments/assets/26d4042a-e37c-4cca-b0e4-6b06c36fa6c0
 
 <img width="1917" height="934" alt="Screenshot 2026-03-01 215850" src="https://github.com/user-attachments/assets/1d9708c5-5a0c-44d5-871d-3c699776863a" />
 
+My project broadly :
+
+It contains a personality quiz interface for all users before logging in. They act as the base weights of the particular individual. I have made curated knowledge base for different categories. A user may enter the decision to be made and add options on their own or make llm make do it. The same for criteria. Then the system adjusts weights accordingly. 
+
 **1. My Understanding of the Problem**
 
 
