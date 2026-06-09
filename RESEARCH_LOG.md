@@ -1,4 +1,4 @@
-###day #1
+### Day #1
 **Topic: UI design**
 
 
@@ -17,7 +17,7 @@ Outcome: from [Stackoverflow] Identified trade-offs in setup complexity and scal
 
 Impact on Development: Opt for SQLite for its portability and simplified deployment.
 
-###day #2
+### Day #2
 
 prompts :
 [ChatGPT]
